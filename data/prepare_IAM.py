@@ -48,6 +48,8 @@ def read_data(data_folder_path, out_height, out_width):
     # Lines with error in segmentation will be excluded
     line_data = {line.split()[0]: [int(line.split()[2]), [ord(char) for char in line.split()[8]]]
                  for line in line_raw if line.split()[1] == 'ok'}
+    num_chars = [i[1] for i in list(line_data.values())]
+    num_chars = len(np.unique(np.concatenate(num_chars)))
 
     # Extract IDs for test, train and val sets
     with open(data_folder_path + '/largeWriterIndependentTextLineRecognitionTask/trainset.txt', 'rb') as f:
@@ -70,13 +72,13 @@ def read_data(data_folder_path, out_height, out_width):
 
     # Import images and labels (map label IDs with label_dict)
     train_images, train_labels, train_im_widths, train_lab_lengths = np.zeros(
-        shape=(len(train_ids), out_height, out_width, 1), dtype=np.float32), [None] * len(train_ids), np.zeros(
+        shape=(len(train_ids), out_width, out_height), dtype=np.float32), [None] * len(train_ids), np.zeros(
         shape=(len(train_ids)), dtype=np.int16), np.zeros(shape=(len(train_ids)), dtype=np.int16)
     val_images, val_labels, val_im_widths, val_lab_lengths = np.zeros(
-        shape=(len(val_ids), out_height, out_width, 1), dtype=np.float32), [None] * len(val_ids), np.zeros(
+        shape=(len(val_ids), out_width, out_height), dtype=np.float32), [None] * len(val_ids), np.zeros(
         shape=(len(val_ids)), dtype=np.int16), np.zeros(shape=(len(val_ids)), dtype=np.int16)
     test_images, test_labels, test_im_widths, test_lab_lengths = np.zeros(
-        shape=(len(test_ids), out_height, out_width, 1), dtype=np.float32), [None] * len(test_ids), np.zeros(
+        shape=(len(test_ids), out_width, out_height), dtype=np.float32), [None] * len(test_ids), np.zeros(
         shape=(len(test_ids)), dtype=np.int16), np.zeros(shape=(len(test_ids)), dtype=np.int16)
 
     def read_img(img_id):
@@ -101,7 +103,7 @@ def read_data(data_folder_path, out_height, out_width):
             img_width = out_width
             img = cv2.resize(img, (out_width, out_height))
 
-        return img.reshape((out_height, out_width, 1)), img_width
+        return img.reshape((out_width, out_height)), img_width
 
     train_im_num, val_im_num, test_im_num = 0, 0, 0
     for im_id in tqdm(train_ids+val_ids+test_ids):
@@ -129,6 +131,7 @@ def read_data(data_folder_path, out_height, out_width):
 
     train_labels_sparse, val_labels_sparse = sparse_tuple_from(train_labels), sparse_tuple_from(val_labels)
     test_labels_sparse = sparse_tuple_from(test_labels)
+    print(f'Number of characters = {num_chars}')
 
     return {'train': {'images': train_images, 'labels': train_labels_sparse,
                       'im_widths': train_im_widths, 'lab_lengths': train_lab_lengths},
