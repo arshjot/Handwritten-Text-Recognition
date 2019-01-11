@@ -22,8 +22,8 @@ class DataGenerator:
             tf.SparseTensor(val['labels'][0], val['labels'][1], val['labels'][2]))
         self.val_dataset = tf.data.Dataset.zip((self.val_dataset, val_label_dataset))
 
-        self.iterator = tf.data.Iterator.from_structure(
-            ((tf.float32, tf.int16, tf.int16), (tf.int64, tf.int32, tf.int64)), self.train_dataset.output_shapes)
+        self.iterator = tf.data.Iterator.from_structure(self.train_dataset.output_types,
+                                                        self.train_dataset.output_shapes)
         self.training_init_op = self.iterator.make_initializer(self.train_dataset)
         self.validation_init_op = self.iterator.make_initializer(self.val_dataset)
 
