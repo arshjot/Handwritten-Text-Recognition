@@ -4,6 +4,7 @@ sys.path.extend(['..'])
 
 import tensorflow as tf
 import shutil
+import os
 from data_loader.data_generator import DataGenerator
 from models.BLSTM_model import BlstmModel
 from trainers.trainer import Trainer
@@ -25,8 +26,10 @@ def main():
 
     # create the experiments dirs
     if config.train_from_start:
-        shutil.rmtree(config.summary_dir)
-        shutil.rmtree(config.checkpoint_dir)
+        if os.path.exists(config.summary_dir):
+            shutil.rmtree(config.summary_dir)
+        if os.path.exists(config.checkpoint_dir):
+            shutil.rmtree(config.checkpoint_dir)
     create_dirs([config.summary_dir, config.checkpoint_dir])
 
     # create tensorflow session
