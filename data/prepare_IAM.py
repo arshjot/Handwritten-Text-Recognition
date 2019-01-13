@@ -20,8 +20,7 @@ sys.path.extend(['..'])
 import cv2
 import numpy as np
 from tqdm import tqdm
-from utils.utils import sparse_tuple_from
-import tensorflow as tf
+from scipy import ndimage
 import argparse
 import pickle
 
@@ -30,7 +29,6 @@ def read_data(data_folder_path, out_height, out_width):
     """
     Return consolidated and preprocessed images, labels, image widths (without pad) and image label lengths
     split into training, validation and test sets
-    Characters are replaced by their ASCII values, can be converted back by using chr()
     Validation Set 2 will be added to Test Set
 
     Arguments:
@@ -46,10 +44,14 @@ def read_data(data_folder_path, out_height, out_width):
 
     # Create dictionary of the format {line_id : [graylevel_for_binarizing, label_in_ascii]}
     # Lines with error in segmentation will be excluded
-    line_data = {line.split()[0]: [int(line.split()[2]), [ord(char) for char in line.split()[8]]]
+    chars = np.unique(np.concatenate([[char for char in line.split()[8]]
+                                      for line in line_raw if line.split()[1] == 'ok']))
+    char_map = {value: idx for (idx, value) in enumerate(chars)}
+    char_map['<BLANK>'] = len(char_map)
+    num_chars = len(char_map.keys())
+
+    line_data = {line.split()[0]: [int(line.split()[2]), [char_map[char] for char in line.split()[8]]]
                  for line in line_raw if line.split()[1] == 'ok'}
-    num_chars = [i[1] for i in list(line_data.values())]
-    num_chars = len(np.unique(np.concatenate(num_chars)))
 
     # Extract IDs for test, train and val sets
     with open(data_folder_path + '/largeWriterIndependentTextLineRecognitionTask/trainset.txt', 'rb') as f:
@@ -73,13 +75,13 @@ def read_data(data_folder_path, out_height, out_width):
     # Import images and labels (map label IDs with label_dict)
     train_images, train_labels, train_im_widths, train_lab_lengths = np.zeros(
         shape=(len(train_ids), out_width, out_height), dtype=np.float32), [None] * len(train_ids), np.zeros(
-        shape=(len(train_ids)), dtype=np.int16), np.zeros(shape=(len(train_ids)), dtype=np.int16)
+        shape=(len(train_ids)), dtype=np.int32), np.zeros(shape=(len(train_ids)), dtype=np.int32)
     val_images, val_labels, val_im_widths, val_lab_lengths = np.zeros(
         shape=(len(val_ids), out_width, out_height), dtype=np.float32), [None] * len(val_ids), np.zeros(
-        shape=(len(val_ids)), dtype=np.int16), np.zeros(shape=(len(val_ids)), dtype=np.int16)
+        shape=(len(val_ids)), dtype=np.int32), np.zeros(shape=(len(val_ids)), dtype=np.int32)
     test_images, test_labels, test_im_widths, test_lab_lengths = np.zeros(
         shape=(len(test_ids), out_width, out_height), dtype=np.float32), [None] * len(test_ids), np.zeros(
-        shape=(len(test_ids)), dtype=np.int16), np.zeros(shape=(len(test_ids)), dtype=np.int16)
+        shape=(len(test_ids)), dtype=np.int32), np.zeros(shape=(len(test_ids)), dtype=np.int32)
 
     def read_img(img_id):
         img = cv2.imread(data_folder_path + '/lines/' + img_id + '.png', 0)
@@ -103,12 +105,13 @@ def read_data(data_folder_path, out_height, out_width):
             img_width = out_width
             img = cv2.resize(img, (out_width, out_height))
 
-        return img.reshape((out_width, out_height)), img_width
+        img = ndimage.rotate(img, 90)
+        return img, img_width
 
     train_im_num, val_im_num, test_im_num = 0, 0, 0
     for im_id in tqdm(train_ids+val_ids+test_ids):
         im, im_width = read_img(im_id)
-        lab = np.array(line_data[im_id][1], dtype=np.int16)
+        lab = np.array(line_data[im_id][1], dtype=np.int32)
 
         if im_id in train_ids:
             train_im_widths[train_p[train_im_num]] = im_width
@@ -129,16 +132,20 @@ def read_data(data_folder_path, out_height, out_width):
             test_labels[test_p[test_im_num]] = lab
             test_im_num += 1
 
-    train_labels_sparse, val_labels_sparse = sparse_tuple_from(train_labels), sparse_tuple_from(val_labels)
-    test_labels_sparse = sparse_tuple_from(test_labels)
+    # train_labels_sparse, val_labels_sparse = sparse_tuple_from(train_labels), sparse_tuple_from(val_labels)
+    # test_labels_sparse = sparse_tuple_from(test_labels)
     print(f'Number of characters = {num_chars}')
+    print(f'Training Samples = {len(train_ids)}')
+    print(f'Validation Samples = {len(val_ids)}')
+    print(f'Test Samples = {len(test_ids)}')
 
-    return {'train': {'images': train_images, 'labels': train_labels_sparse,
+    return {'train': {'images': train_images, 'labels': train_labels,
                       'im_widths': train_im_widths, 'lab_lengths': train_lab_lengths},
-            'validation': {'images': val_images, 'labels': val_labels_sparse,
+            'validation': {'images': val_images, 'labels': val_labels,
                            'im_widths': val_im_widths, 'lab_lengths': val_lab_lengths},
-            'test': {'images': test_images, 'labels': test_labels_sparse,
-                     'im_widths': test_im_widths, 'lab_lengths': test_lab_lengths}}
+            'test': {'images': test_images, 'labels': test_labels,
+                     'im_widths': test_im_widths, 'lab_lengths': test_lab_lengths},
+            'num_chars' : num_chars, 'char_map': char_map}
 
 
 if __name__ == '__main__':
@@ -153,8 +160,8 @@ if __name__ == '__main__':
     args = vars(ap.parse_args())
 
     data_dir = './IAM/' if args['data_dir'] is None else args['data_dir']
-    height = 32 if args['out_height'] is None else args['out_height']
-    width = 320 if args['out_width'] is None else args['out_width']
+    height = 40 if args['out_height'] is None else args['out_height']
+    width = 800 if args['out_width'] is None else args['out_width']
     output = './iam' if args['output'] is None else args['output']
 
     print('Loading Data:')
