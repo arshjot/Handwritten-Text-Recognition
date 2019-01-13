@@ -14,7 +14,7 @@ def get_args():
 
 
 def sparse_tuple_from(sequences, dtype=np.int32):
-    """Create a sparse representention of x.
+    """Create a sparse representation of x.
     Args:
         sequences: a list of lists of type dtype where each element is a sequence
     Returns:
