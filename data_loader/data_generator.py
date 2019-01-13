@@ -32,7 +32,8 @@ class DataGenerator:
 
         self.val_dataset = self.val_dataset.padded_batch(
             self.config.batch_size,
-            padded_shapes=((tf.TensorShape([self.config.im_width, self.config.im_height]), tf.TensorShape([]), tf.TensorShape([])), tf.TensorShape([None])),
+            padded_shapes=((tf.TensorShape([self.config.im_width, self.config.im_height]),
+                            tf.TensorShape([]), tf.TensorShape([])), tf.TensorShape([None])),
             padding_values=((tf.constant(0.0), tf.constant(0), tf.constant(0)), tf.constant(-1)))
         self.val_dataset = self.val_dataset.prefetch(tf.contrib.data.AUTOTUNE)
 
