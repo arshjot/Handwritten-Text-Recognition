@@ -37,15 +37,15 @@ class BlstmModel(BaseModel):
 
         # Inputs to the network
         with tf.variable_scope('inputs'):
-            self.x, self.y = self.data_loader.get_input()
-            self.y = tf.contrib.layers.dense_to_sparse(self.y, eos_token=-1)
+            self.x, y = self.data_loader.get_input()
+            self.y = tf.contrib.layers.dense_to_sparse(y, eos_token=-1)
             self.x, self.length, self.lab_length = self.x
             self.x = tf.transpose(self.x, [1, 0, 2])
             self.is_training = tf.placeholder(tf.bool, name='Training_flag')
         tf.add_to_collection('inputs', self.x)
         tf.add_to_collection('inputs', self.length)
         tf.add_to_collection('inputs', self.lab_length)
-        tf.add_to_collection('inputs', self.y)
+        tf.add_to_collection('inputs', y)
         tf.add_to_collection('inputs', self.is_training)
 
         # Network Architecture
@@ -83,8 +83,6 @@ class BlstmModel(BaseModel):
         # Reshaping back to the original shape
         self.logits = tf.reshape(logits, [self.config.batch_size, -1, self.data_loader.num_classes])
         self.logits = tf.transpose(self.logits, (1, 0, 2))
-
-        tf.add_to_collection('out', self.logits)
 
         with tf.variable_scope('loss-acc'):
             self.loss = tf.reduce_mean(

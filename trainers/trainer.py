@@ -13,7 +13,7 @@ class Trainer(BaseTrain):
         # Summarizer
         self.summarizer = logger
 
-        self.x,self.length, self.lab_length,  self.y, self.is_training = tf.get_collection('inputs')
+        self.x, self.length, self.lab_length,  self.y, self.is_training = tf.get_collection('inputs')
         self.train_op, self.loss_node, self.acc_node = tf.get_collection('train')
 
     def train(self):
@@ -60,7 +60,7 @@ class Trainer(BaseTrain):
 
         self.model.save(self.sess)
 
-        print("""Epoch-{}  loss:{:.4f} -- ler:{:.4f}""".format(epoch, loss, ler))
+        print("""Epoch-{}  loss:{:.4f} -- ler:{:.4f}""".format(epoch+1, loss, ler))
 
     def train_step(self):
         """
@@ -96,4 +96,4 @@ class Trainer(BaseTrain):
         }
         self.summarizer.summarize(self.model.global_step_tensor.eval(self.sess), summaries_dict)
 
-        print("""Val-{}  loss:{:.4f} -- ler:{:.4f}""".format(epoch, loss, ler))
+        print("""Val-{}  loss:{:.4f} -- ler:{:.4f}""".format(epoch+1, loss, ler))
