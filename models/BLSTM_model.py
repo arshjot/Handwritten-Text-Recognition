@@ -88,7 +88,6 @@ class BlstmModel(BaseModel):
         tf.add_to_collection('train', self.train_step)
         tf.add_to_collection('train', self.cost)
         tf.add_to_collection('train', self.cer)
-        tf.add_to_collection('sample_pred', self.prediction[0][0].values)
 
     def init_saver(self):
         self.saver = tf.train.Saver(max_to_keep=self.config.max_to_keep, save_relative_paths=True)

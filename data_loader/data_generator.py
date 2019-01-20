@@ -10,7 +10,6 @@ class DataGenerator:
             data = pickle.load(f)
         train, val = data['train'], data['validation']
         self.train_label, self.val_label = train['labels'], val['labels']
-        self.char_map_inv = {i: j for j, i in data['char_map'].items()}
 
         self.train_dataset = tf.data.Dataset.from_tensor_slices(
             (train['images'], train['im_widths'], train['lab_lengths']))
@@ -44,8 +43,8 @@ class DataGenerator:
         self.validation_init_op = self.iterator.make_initializer(self.val_dataset)
 
         self.num_classes = data['num_chars']
-        self.num_iterations_train = len(train['images']) // (self.config.batch_size*500)
-        self.num_iterations_val = len(val['images']) // (self.config.batch_size*500)
+        self.num_iterations_train = len(train['images']) // self.config.batch_size
+        self.num_iterations_val = len(val['images']) // self.config.batch_size
 
     def train_generator(self):
         for el in self.train_label:
