@@ -44,8 +44,8 @@ class DataGenerator:
         self.validation_init_op = self.iterator.make_initializer(self.val_dataset)
 
         self.num_classes = data['num_chars']
-        self.num_iterations_train = len(train['images']) // (self.config.batch_size*500)
-        self.num_iterations_val = len(val['images']) // (self.config.batch_size*500)
+        self.num_iterations_train = len(train['images']) // self.config.batch_size
+        self.num_iterations_val = len(val['images']) // self.config.batch_size
 
     def train_generator(self):
         for el in self.train_label:
