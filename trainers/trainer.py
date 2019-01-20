@@ -21,7 +21,7 @@ class Trainer(BaseTrain):
         This is the main loop of training
         Looping on the epochs
         """
-        for cur_epoch in range(self.model.cur_epoch_tensor.eval(self.sess), self.config.num_epochs + 1, 1):
+        for cur_epoch in range(self.model.cur_epoch_tensor.eval(self.sess), self.config.num_epochs, 1):
             self.train_epoch(cur_epoch)
             self.sess.run(self.model.increment_cur_epoch_tensor)
             self.test(cur_epoch)
@@ -39,37 +39,37 @@ class Trainer(BaseTrain):
         progbar = tf.keras.utils.Progbar(self.data_loader.num_iterations_train)
 
         # Iterate over batches
-        losses = []
-        lers = []
+        losses, cers = [], []
+
         for _ in tt:
-            loss, ler = self.train_step()
+            loss, cer = self.train_step()
             losses.append(loss)
-            lers.append(ler)
-            progbar.update(_, values=[('loss', loss), ('ler', ler)])
+            cers.append(cer)
+            progbar.update(_, values=[('loss', loss), ('cer', cer)])
         loss = np.mean(losses)
-        ler = np.mean(lers)
+        cer = np.mean(cers)
 
         self.sess.run(self.model.global_epoch_inc)
 
         # summarize
         summaries_dict = {
             'train/loss_per_epoch': loss,
-            'train/ler_per_epoch': ler,
+            'train/cer_per_epoch': cer,
         }
         self.summarizer.summarize(self.model.global_step_tensor.eval(self.sess), summaries_dict)
 
         self.model.save(self.sess)
 
-        print("""Epoch-{}  loss:{:.4f} -- ler:{:.4f}""".format(epoch+1, loss, ler))
+        print("""\tEpoch-{}: Train - loss:{:.4f} -- cer:{:.4f}""".format(epoch+1, loss, cer), end="")
 
     def train_step(self):
         """
         Run the session of train_step in tensorflow, also get the loss & acc of that minibatch.
         :return: (loss, ler) tuple of some metrics to be used in summaries
         """
-        _, loss, ler = self.sess.run([self.train_op, self.loss_node, self.acc_node],
+        _, loss, cer = self.sess.run([self.train_op, self.loss_node, self.acc_node],
                                      feed_dict={self.is_training: True})
-        return loss, ler
+        return loss, cer
 
     def test(self, epoch):
         # initialize dataset
@@ -78,22 +78,21 @@ class Trainer(BaseTrain):
         # initialize tqdm
         tt = range(self.data_loader.num_iterations_val)
 
-        losses = []
-        lers = []
+        losses, cers = [], []
         # Iterate over batches
         for _ in tt:
-            loss, ler = self.sess.run([self.loss_node, self.acc_node],
+            loss, cer = self.sess.run([self.loss_node, self.acc_node],
                                       feed_dict={self.is_training: False})
             losses.append(loss)
-            lers.append(ler)
+            cers.append(cer)
         loss = np.mean(losses)
-        ler = np.mean(lers)
+        cer = np.mean(cers)
 
         # summarize
         summaries_dict = {
             'test/loss_per_epoch': loss,
-            'test/ler_per_epoch': ler,
+            'test/cer_per_epoch': cer,
         }
         self.summarizer.summarize(self.model.global_step_tensor.eval(self.sess), summaries_dict)
 
-        print("""Val-{}  loss:{:.4f} -- ler:{:.4f}""".format(epoch+1, loss, ler))
+        print("""\tVal - loss:{:.4f} -- cer:{:.4f}""".format(loss, cer))

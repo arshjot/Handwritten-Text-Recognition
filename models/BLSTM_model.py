@@ -25,7 +25,7 @@ class BlstmModel(BaseModel):
         self.init_saver()
 
     @staticmethod
-    def calc_ler(predicted, targets):
+    def calc_cer(predicted, targets):
         return tf.edit_distance(tf.cast(predicted, tf.int32), targets, normalize=True)
 
     def build_model(self):
@@ -56,7 +56,7 @@ class BlstmModel(BaseModel):
         # RNN
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE) as sc:
             lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
-                                                           'linear_input', 'bidirectional', name=sc)
+                                                  'linear_input', 'bidirectional', name=sc)
             output, state = lstm(self.x)
 
         # Fully Connected
@@ -72,12 +72,12 @@ class BlstmModel(BaseModel):
         self.logits = tf.transpose(self.logits, (1, 0, 2))
 
         with tf.variable_scope('loss-acc'):
-            self.loss = warpctc_tensorflow.ctc(self.logits, self.y.values,
-                                       self.lab_length, self.length, self.data_loader.num_classes - 1)
+            self.loss = warpctc_tensorflow.ctc(self.logits, self.y.values, self.lab_length, self.length,
+                                               self.data_loader.num_classes - 1)
             self.cost = tf.reduce_mean(self.loss)
             self.prediction = tf.nn.ctc_beam_search_decoder(self.logits, sequence_length=self.length,
                                                             merge_repeated=True)
-            self.ler = self.calc_ler(self.prediction[0][0], self.y)
+            self.cer = self.calc_cer(self.prediction[0][0], self.y)
 
         with tf.variable_scope('train_step'):
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -87,7 +87,7 @@ class BlstmModel(BaseModel):
 
         tf.add_to_collection('train', self.train_step)
         tf.add_to_collection('train', self.cost)
-        tf.add_to_collection('train', self.ler)
+        tf.add_to_collection('train', self.cer)
 
     def init_saver(self):
         self.saver = tf.train.Saver(max_to_keep=self.config.max_to_keep, save_relative_paths=True)
