@@ -42,10 +42,16 @@ class Trainer(BaseTrain):
         losses, cers = [], []
 
         for _ in tt:
-            loss, cer = self.train_step()
-            losses.append(loss)
-            cers.append(cer)
-            progbar.update(_, values=[('loss', loss), ('cer', cer)])
+            # Beam search prediction at every 10th step only - to improve training speed
+            if _ % 10 == 0:
+                loss, cer = self.train_step()
+                cers.append(cer)
+                losses.append(loss)
+                progbar.update(_, values=[('loss', loss), ('cer', cer)])
+            else:
+                loss = self.train_step(get_err=False)
+                progbar.update(_, values=[('loss', loss)])
+
         loss = np.mean(losses)
         cer = np.mean(cers)
 
@@ -62,14 +68,19 @@ class Trainer(BaseTrain):
 
         print("""\tEpoch-{}: Train - loss:{:.4f} -- cer:{:.4f}""".format(epoch+1, loss, cer), end="")
 
-    def train_step(self):
+    def train_step(self, get_err=True):
         """
         Run the session of train_step in tensorflow, also get the loss & acc of that minibatch.
         :return: (loss, ler) tuple of some metrics to be used in summaries
         """
-        _, loss, cer = self.sess.run([self.train_op, self.loss_node, self.acc_node],
-                                     feed_dict={self.is_training: True})
-        return loss, cer
+        if get_err:
+            _, loss, cer = self.sess.run([self.train_op, self.loss_node, self.acc_node],
+                                         feed_dict={self.is_training: True})
+            return loss, cer
+        else:
+            _, loss = self.sess.run([self.train_op, self.loss_node],
+                                    feed_dict={self.is_training: True})
+            return loss
 
     def test(self, epoch):
         # initialize dataset
