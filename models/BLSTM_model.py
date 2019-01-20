@@ -54,23 +54,10 @@ class BlstmModel(BaseModel):
         out_b = tf.Variable(tf.constant(0., shape=[self.data_loader.num_classes]), name='out_b')
 
         # RNN
-        with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE):
-            stacked_rnn = []
-            for i in range(self.rnn_num_layers):
-                stacked_rnn.append(tf.nn.rnn_cell.LSTMCell(num_units=self.rnn_num_hidden, state_is_tuple=True))
-            with tf.variable_scope('forward'):
-                cell_fw = tf.nn.rnn_cell.MultiRNNCell(stacked_rnn, state_is_tuple=True)
-            with tf.variable_scope('backward'):
-                cell_bw = tf.nn.rnn_cell.MultiRNNCell(stacked_rnn, state_is_tuple=True)
-            output, state = tf.nn.bidirectional_dynamic_rnn(
-                cell_fw,
-                cell_bw,
-                inputs=self.x,
-                dtype=tf.float32,
-                sequence_length=self.length,
-                time_major=True,
-                scope='MultiRNN'
-            )
+        with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE) as sc:
+            lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
+                                                           'linear_input', 'bidirectional', name=sc)
+            output, state = lstm(self.x)
 
         # Fully Connected
         with tf.name_scope('Dense'):
@@ -85,9 +72,9 @@ class BlstmModel(BaseModel):
         self.logits = tf.transpose(self.logits, (1, 0, 2))
 
         with tf.variable_scope('loss-acc'):
-            self.loss = tf.reduce_mean(
-                warpctc_tensorflow.ctc(self.logits, self.y.values,
-                                       self.lab_length, self.length, self.data_loader.num_classes - 1))
+            self.loss = warpctc_tensorflow.ctc(self.logits, self.y.values,
+                                       self.lab_length, self.length, self.data_loader.num_classes - 1)
+            self.cost = tf.reduce_mean(self.loss)
             self.prediction = tf.nn.ctc_beam_search_decoder(self.logits, sequence_length=self.length,
                                                             merge_repeated=True)
             self.ler = self.calc_ler(self.prediction[0][0], self.y)
@@ -99,7 +86,7 @@ class BlstmModel(BaseModel):
                     self.loss, global_step=self.global_step_tensor)
 
         tf.add_to_collection('train', self.train_step)
-        tf.add_to_collection('train', self.loss)
+        tf.add_to_collection('train', self.cost)
         tf.add_to_collection('train', self.ler)
 
     def init_saver(self):
