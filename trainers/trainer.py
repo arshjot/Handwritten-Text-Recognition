@@ -15,6 +15,7 @@ class Trainer(BaseTrain):
 
         self.x, self.length, self.lab_length,  self.y, self.is_training = tf.get_collection('inputs')
         self.train_op, self.loss_node, self.acc_node = tf.get_collection('train')
+        self.pred = tf.get_collection('sample_pred')
 
     def train(self):
         """
@@ -24,7 +25,7 @@ class Trainer(BaseTrain):
         for cur_epoch in range(self.model.cur_epoch_tensor.eval(self.sess), self.config.num_epochs, 1):
             self.train_epoch(cur_epoch)
             self.sess.run(self.model.increment_cur_epoch_tensor)
-            self.test(cur_epoch)
+            self.test()
 
     def train_epoch(self, epoch=None):
         """
@@ -34,7 +35,7 @@ class Trainer(BaseTrain):
         # initialize dataset
         self.data_loader.initialize(self.sess, is_train=True)
 
-        # initialize tqdm
+        # Progress bar
         tt = range(self.data_loader.num_iterations_train)
         progbar = tf.keras.utils.Progbar(self.data_loader.num_iterations_train)
 
@@ -82,18 +83,23 @@ class Trainer(BaseTrain):
                                     feed_dict={self.is_training: True})
             return loss
 
-    def test(self, epoch):
+    def test(self):
         # initialize dataset
         self.data_loader.initialize(self.sess, is_train=False)
 
-        # initialize tqdm
+        # Progress bar
         tt = range(self.data_loader.num_iterations_val)
+        sample_num = np.random.choice(tt)
 
         losses, cers = [], []
         # Iterate over batches
         for _ in tt:
-            loss, cer = self.sess.run([self.loss_node, self.acc_node],
-                                      feed_dict={self.is_training: False})
+            if self.config.random_prediction & _ == sample_num:
+                loss, cer, pred, label = self.sess.run([self.loss_node, self.acc_node, self.pred, self.y],
+                                                       feed_dict={self.is_training: False})
+            else:
+                loss, cer = self.sess.run([self.loss_node, self.acc_node],
+                                          feed_dict={self.is_training: False})
             losses.append(loss)
             cers.append(cer)
         loss = np.mean(losses)
@@ -107,3 +113,8 @@ class Trainer(BaseTrain):
         self.summarizer.summarize(self.model.global_step_tensor.eval(self.sess), summaries_dict)
 
         print("""\tVal - loss:{:.4f} -- cer:{:.4f}""".format(loss, cer))
+
+        if self.config.random_prediction:  # Print random prediction and corresponding label
+            pred = ''.join([self.data_loader.char_map_inv[i] for i in pred[0]])
+            label = ''.join([self.data_loader.char_map_inv[i] for i in label[0][:np.where(label[0] == -1)[0][0]]])
+            print("Label: {}\nPrediction: {}".format(label, pred))

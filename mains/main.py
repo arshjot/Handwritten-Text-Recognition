@@ -43,8 +43,8 @@ def main():
 
     # create tensorboard logger
     logger = DefinedSummarizer(sess, summary_dir=config.summary_dir,
-                               scalar_tags=['train/loss_per_epoch', 'train/ler_per_epoch',
-                                            'test/loss_per_epoch', 'test/ler_per_epoch'])
+                               scalar_tags=['train/loss_per_epoch', 'train/cer_per_epoch',
+                                            'test/loss_per_epoch', 'test/cer_per_epoch'])
 
     # create trainer and path all previous components to it
     trainer = Trainer(sess, model, config, logger, data_loader)
