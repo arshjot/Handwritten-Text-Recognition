@@ -1,12 +1,13 @@
 {
-  "exp_name": "BLSTM",
+  "exp_name": "BLSTM_opt",
   "train_from_start": 1,
+  "random_prediction": 1,
 
   "im_height": 40,
   "im_width": 800,
 
-  "batch_size": 10,
-  "num_epochs": 100,
+  "batch_size": 1,
+  "num_epochs": 1,
   "learning_rate": 0.00027,
 
   "max_to_keep": 2
