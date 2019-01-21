@@ -1,5 +1,5 @@
 {
-  "exp_name": "BLSTM_opt",
+  "exp_name": "CRNN",
   "train_from_start": 1,
   "random_prediction": 1,
 
@@ -7,7 +7,7 @@
   "im_width": 800,
 
   "batch_size": 1,
-  "num_epochs": 1,
+  "num_epochs": 100,
   "learning_rate": 0.00027,
 
   "max_to_keep": 2
