@@ -94,7 +94,7 @@ class Trainer(BaseTrain):
         losses, cers = [], []
         # Iterate over batches
         for _ in tt:
-            if self.config.random_prediction & _ == sample_num:
+            if self.config.random_prediction & (_ == sample_num):
                 loss, cer, pred, label = self.sess.run([self.loss_node, self.acc_node, self.pred, self.y],
                                                        feed_dict={self.is_training: False})
             else:
