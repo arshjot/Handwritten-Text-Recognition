@@ -6,7 +6,7 @@ import tensorflow as tf
 import shutil
 import os
 from data_loader.data_generator import DataGenerator
-from models.BLSTM_model import BlstmModel
+from models.CRNN_model import Model
 from trainers.trainer import Trainer
 from utils.config import process_config
 from utils.dirs import create_dirs
@@ -39,7 +39,7 @@ def main():
     data_loader = DataGenerator(config)
 
     # create instance of the model you want
-    model = BlstmModel(data_loader, config)
+    model = Model(data_loader, config)
 
     # create tensorboard logger
     logger = DefinedSummarizer(sess, summary_dir=config.summary_dir,

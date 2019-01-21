@@ -3,9 +3,9 @@ import tensorflow as tf
 import warpctc_tensorflow
 
 
-class BlstmModel(BaseModel):
+class Model(BaseModel):
     def __init__(self, data_loader, config):
-        super(BlstmModel, self).__init__(config)
+        super(Model, self).__init__(config)
         self.rnn_num_hidden = 300
         self.rnn_num_layers = 3
 
