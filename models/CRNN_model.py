@@ -85,8 +85,7 @@ class Model(BaseModel):
         conv4_out = tf.layers.conv2d(conv3_out, self.conv4_depth, self.conv4_patch_size, padding='same',
                                      activation=tf.nn.leaky_relu, kernel_initializer=intitalizer, name='cnn_4')
 
-        cnn_out = tf.reshape(conv4_out, [self.config.batch_size, -1,
-                                         self.conv4_depth*self.config.im_height//self.reduce_factor])
+        cnn_out = tf.reduce_sum(conv4_out, axis=1)
         cnn_out = tf.transpose(cnn_out, [1, 0, 2])
         cnn_out = tf.layers.dropout(cnn_out, 0.8, training=self.is_training, name='drop_cnn')
 
@@ -125,7 +124,6 @@ class Model(BaseModel):
         tf.add_to_collection('train', self.train_step)
         tf.add_to_collection('train', self.cost)
         tf.add_to_collection('train', self.cer)
-        tf.add_to_collection('sample_pred', self.prediction[0][0].values)
 
     def init_saver(self):
         self.saver = tf.train.Saver(max_to_keep=self.config.max_to_keep, save_relative_paths=True)

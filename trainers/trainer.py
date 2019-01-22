@@ -15,7 +15,7 @@ class Trainer(BaseTrain):
 
         self.x, self.length, self.lab_length,  self.y, self.is_training = tf.get_collection('inputs')
         self.train_op, self.loss_node, self.acc_node = tf.get_collection('train')
-        self.pred = tf.get_collection('sample_pred')
+        self.pred = self.model.prediction
 
     def train(self):
         """
@@ -95,8 +95,8 @@ class Trainer(BaseTrain):
         # Iterate over batches
         for _ in tt:
             if self.config.random_prediction & (_ == sample_num):
-                loss, cer, pred, label = self.sess.run([self.loss_node, self.acc_node, self.pred, self.y],
-                                                       feed_dict={self.is_training: False})
+                loss, cer, predictions, label = self.sess.run([self.loss_node, self.acc_node, self.pred, self.y],
+                                                              feed_dict={self.is_training: False})
             else:
                 loss, cer = self.sess.run([self.loss_node, self.acc_node],
                                           feed_dict={self.is_training: False})
@@ -115,6 +115,10 @@ class Trainer(BaseTrain):
         print("""\tVal - loss:{:.4f} -- cer:{:.4f}""".format(loss, cer))
 
         if self.config.random_prediction:  # Print random prediction and corresponding label
+            pred = np.zeros(predictions[0][0].dense_shape)
+            for idx, val in enumerate(predictions[0][0].indices):
+                pred[val[0]][val[1]] = predictions[0][0].values[idx]
             pred = ''.join([self.data_loader.char_map_inv[i] for i in pred[0]])
-            label = ''.join([self.data_loader.char_map_inv[i] for i in label[0][:np.where(label[0] == -1)[0][0]]])
+            end_idx = np.where(label[0] == -1)[0][0] if len(np.where(label[0] == -1)[0])!=0 else len(label[0])
+            label = ''.join([self.data_loader.char_map_inv[i] for i in label[0][:end_idx]])
             print("Label: {}\nPrediction: {}".format(label, pred))

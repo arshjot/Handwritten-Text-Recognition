@@ -20,7 +20,6 @@ sys.path.extend(['..'])
 import cv2
 import numpy as np
 from tqdm import tqdm
-from scipy import ndimage
 import argparse
 import pickle
 
@@ -74,13 +73,13 @@ def read_data(data_folder_path, out_height, out_width):
 
     # Import images and labels (map label IDs with label_dict)
     train_images, train_labels, train_im_widths, train_lab_lengths = np.zeros(
-        shape=(len(train_ids), out_width, out_height), dtype=np.float32), [None] * len(train_ids), np.zeros(
+        shape=(len(train_ids), out_height, out_width), dtype=np.float32), [None] * len(train_ids), np.zeros(
         shape=(len(train_ids)), dtype=np.int32), np.zeros(shape=(len(train_ids)), dtype=np.int32)
     val_images, val_labels, val_im_widths, val_lab_lengths = np.zeros(
-        shape=(len(val_ids), out_width, out_height), dtype=np.float32), [None] * len(val_ids), np.zeros(
+        shape=(len(val_ids), out_height, out_width), dtype=np.float32), [None] * len(val_ids), np.zeros(
         shape=(len(val_ids)), dtype=np.int32), np.zeros(shape=(len(val_ids)), dtype=np.int32)
     test_images, test_labels, test_im_widths, test_lab_lengths = np.zeros(
-        shape=(len(test_ids), out_width, out_height), dtype=np.float32), [None] * len(test_ids), np.zeros(
+        shape=(len(test_ids), out_height, out_width), dtype=np.float32), [None] * len(test_ids), np.zeros(
         shape=(len(test_ids)), dtype=np.int32), np.zeros(shape=(len(test_ids)), dtype=np.int32)
 
     def read_img(img_id):
@@ -90,9 +89,6 @@ def read_data(data_folder_path, out_height, out_width):
         img[img > line_data[im_id][0]] = 255
         img = cv2.bitwise_not(img)
         img = np.divide(img.astype(np.float32), 255.0)
-
-        # Smoothing
-        img = cv2.GaussianBlur(img, (3, 3), 0)
 
         # Resize - put a height cap and resize accordingly
         resize_width = int((img.shape[1] / img.shape[0]) * out_height)
@@ -105,7 +101,6 @@ def read_data(data_folder_path, out_height, out_width):
             img_width = out_width
             img = cv2.resize(img, (out_width, out_height))
 
-        img = ndimage.rotate(img, 90)
         return img, img_width
 
     train_im_num, val_im_num, test_im_num = 0, 0, 0

@@ -26,14 +26,14 @@ class DataGenerator:
 
         self.train_dataset = self.train_dataset.padded_batch(
             self.config.batch_size,
-            padded_shapes=((tf.TensorShape([self.config.im_width, self.config.im_height]),
+            padded_shapes=((tf.TensorShape([self.config.im_height, self.config.im_width]),
                             tf.TensorShape([]), tf.TensorShape([])), tf.TensorShape([None])),
             padding_values=((tf.constant(0.0), tf.constant(0), tf.constant(0)), tf.constant(-1)))
         self.train_dataset = self.train_dataset.prefetch(tf.contrib.data.AUTOTUNE)
 
         self.val_dataset = self.val_dataset.padded_batch(
             self.config.batch_size,
-            padded_shapes=((tf.TensorShape([self.config.im_width, self.config.im_height]),
+            padded_shapes=((tf.TensorShape([self.config.im_height, self.config.im_width]),
                             tf.TensorShape([]), tf.TensorShape([])), tf.TensorShape([None])),
             padding_values=((tf.constant(0.0), tf.constant(0), tf.constant(0)), tf.constant(-1)))
         self.val_dataset = self.val_dataset.prefetch(tf.contrib.data.AUTOTUNE)
@@ -69,7 +69,7 @@ def main():
     class Config:
         im_height = 40
         im_width = 800
-        batch_size = 2
+        batch_size = 1
 
     tf.reset_default_graph()
     sess = tf.Session()
