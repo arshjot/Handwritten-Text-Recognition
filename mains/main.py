@@ -6,12 +6,12 @@ import tensorflow as tf
 import shutil
 import os
 from data_loader.data_generator import DataGenerator
-from models.CRNN_model import Model
 from trainers.trainer import Trainer
 from utils.config import process_config
 from utils.dirs import create_dirs
 from utils.logger import DefinedSummarizer
 from utils.utils import get_args
+from importlib import import_module
 
 
 def main():
@@ -23,6 +23,10 @@ def main():
     except:
         print("missing or invalid arguments")
         exit(0)
+
+    # Get Model
+    model_types = import_module('models.' + config.architecture + '_model')
+    Model = getattr(model_types, 'Model')
 
     # create the experiments dirs
     if config.train_from_start:

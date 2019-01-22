@@ -3,6 +3,8 @@
   "train_from_start": 1,
   "random_prediction": 1,
 
+  "architecture": "CRNN",
+
   "im_height": 40,
   "im_width": 800,
 
