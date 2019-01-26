@@ -6,8 +6,8 @@ import warpctc_tensorflow
 class Model(BaseModel):
     def __init__(self, data_loader, config):
         super(Model, self).__init__(config)
-        self.rnn_num_hidden = 300
-        self.rnn_num_layers = 3
+        self.rnn_num_hidden = 256
+        self.rnn_num_layers = 4
 
         # Get the data_loader to make the joint of the inputs in the graph
         self.data_loader = data_loader
@@ -56,7 +56,7 @@ class Model(BaseModel):
         # RNN
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE) as sc:
             lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
-                                                  'linear_input', 'bidirectional', name=sc)
+                                                  'linear_input', 'bidirectional', dropout=0.1, name=sc)
             output, state = lstm(self.x)
 
         # Fully Connected
