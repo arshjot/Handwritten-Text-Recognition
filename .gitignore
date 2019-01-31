@@ -113,4 +113,7 @@ experiments/
 *.h5py
 
 # Data directory
-/data/IAM/
+/data/IAM/lines
+/data/IAM/processed_lines
+/data/IAM/largeWriterIndependentTextLineRecognitionTask
+/data/IAM/lines.txt
