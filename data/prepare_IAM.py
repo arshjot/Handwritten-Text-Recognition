@@ -5,10 +5,10 @@ Ensure the following directory structure is followed:
 ├── data
 |   ├── IAM
 |       ├──lines.txt
-|       └──largeWriterIndependentTextLineRecognitionTask
-|           └──test, train, validation .txt files
 |       └──lines
 |           └──.png image files
+|       └──aachen_partition
+|           └──te.lst, tr.lst, va.lst
 |   └── prepare_IAM.py
 
 Then run this script to prepare the data of IAM
@@ -53,18 +53,15 @@ def read_data(data_folder_path, out_height, out_width):
                  for line in line_raw if line.split()[1] == 'ok'}
 
     # Extract IDs for test, train and val sets
-    with open(data_folder_path + '/largeWriterIndependentTextLineRecognitionTask/trainset.txt', 'rb') as f:
+    with open(data_folder_path + '/aachen_partition/tr.lst', 'rb') as f:
         ids = f.read().decode('unicode_escape')
         train_ids = [i for i in ids.splitlines() if i in list(line_data.keys())]
-    with open(data_folder_path + '/largeWriterIndependentTextLineRecognitionTask/validationset1.txt', 'rb') as f:
+    with open(data_folder_path + '/aachen_partition/va.lst', 'rb') as f:
         ids = f.read().decode('unicode_escape')
         val_ids = [i for i in ids.splitlines() if i in list(line_data.keys())]
-    with open(data_folder_path + '/largeWriterIndependentTextLineRecognitionTask/testset.txt', 'rb') as f:
+    with open(data_folder_path + '/aachen_partition/te.lst', 'rb') as f:
         ids = f.read().decode('unicode_escape')
         test_ids = [i for i in ids.splitlines() if i in list(line_data.keys())]
-    with open(data_folder_path + '/largeWriterIndependentTextLineRecognitionTask/validationset2.txt', 'rb') as f:
-        ids = f.read().decode('unicode_escape')
-        test_ids += [i for i in ids.splitlines() if i in list(line_data.keys())]
 
     # For random order generation (shuffling)
     train_p = np.random.permutation(len(train_ids))
@@ -83,10 +80,11 @@ def read_data(data_folder_path, out_height, out_width):
         shape=(len(test_ids)), dtype=np.int32), np.zeros(shape=(len(test_ids)), dtype=np.int32)
 
     def read_img(img_id):
-        img = cv2.imread(data_folder_path + '/lines/' + img_id + '.png', 0)
+        img = cv2.imread(data_folder_path + '/processed_lines/' + img_id + '.png', 0)
 
         # Threshold images to remove background and invert colors
-        img[img > line_data[im_id][0]] = 255
+        # TODO: Run below line if pre-processing = False and change path for above line
+        # img[img > line_data[im_id][0]] = 255
         img = cv2.bitwise_not(img)
         img = np.divide(img.astype(np.float32), 255.0)
 
@@ -155,8 +153,8 @@ if __name__ == '__main__':
     args = vars(ap.parse_args())
 
     data_dir = './IAM/' if args['data_dir'] is None else args['data_dir']
-    height = 40 if args['out_height'] is None else args['out_height']
-    width = 800 if args['out_width'] is None else args['out_width']
+    height = 64 if args['out_height'] is None else args['out_height']
+    width = 1280 if args['out_width'] is None else args['out_width']
     output = './iam' if args['output'] is None else args['output']
 
     print('Loading Data:')
