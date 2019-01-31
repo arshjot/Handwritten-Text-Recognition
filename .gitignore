@@ -111,6 +111,7 @@ experiments/
 *.h5
 *.pkl
 *.h5py
+*.tfrecords
 
 # Data directory
 /data/IAM/lines

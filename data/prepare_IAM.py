@@ -21,10 +21,10 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 import argparse
-import pickle
+import tensorflow as tf
 
 
-def read_data(data_folder_path, out_height, out_width):
+def read_data(data_folder_path, out_height, out_name):
     """
     Return consolidated and preprocessed images, labels, image widths (without pad) and image label lengths
     split into training, validation and test sets
@@ -33,7 +33,7 @@ def read_data(data_folder_path, out_height, out_width):
     Arguments:
     data_folder_path : Path of folder with lines.txt, 'lines' & 'largeWriterIndependentTextLineRecognitionTask' folders
     out_height       : Height of output image
-    out_width        : Width of output image
+    out_name        : Path and name of output tfrecords file
     """
 
     # Extract label text and IDs from lines.txt
@@ -63,24 +63,9 @@ def read_data(data_folder_path, out_height, out_width):
         ids = f.read().decode('unicode_escape')
         test_ids = [i for i in ids.splitlines() if i in list(line_data.keys())]
 
-    # For random order generation (shuffling)
-    train_p = np.random.permutation(len(train_ids))
-    val_p = np.random.permutation(len(val_ids))
-    test_p = np.random.permutation(len(test_ids))
-
-    # Import images and labels (map label IDs with label_dict)
-    train_images, train_labels, train_im_widths, train_lab_lengths = np.zeros(
-        shape=(len(train_ids), out_height, out_width), dtype=np.float32), [None] * len(train_ids), np.zeros(
-        shape=(len(train_ids)), dtype=np.int32), np.zeros(shape=(len(train_ids)), dtype=np.int32)
-    val_images, val_labels, val_im_widths, val_lab_lengths = np.zeros(
-        shape=(len(val_ids), out_height, out_width), dtype=np.float32), [None] * len(val_ids), np.zeros(
-        shape=(len(val_ids)), dtype=np.int32), np.zeros(shape=(len(val_ids)), dtype=np.int32)
-    test_images, test_labels, test_im_widths, test_lab_lengths = np.zeros(
-        shape=(len(test_ids), out_height, out_width), dtype=np.float32), [None] * len(test_ids), np.zeros(
-        shape=(len(test_ids)), dtype=np.int32), np.zeros(shape=(len(test_ids)), dtype=np.int32)
-
-    def read_img(img_id):
+    def convert_image(img_id, lines_data):
         img = cv2.imread(data_folder_path + '/processed_lines/' + img_id + '.png', 0)
+        lab = np.array(lines_data[img_id][1], dtype=np.int32)
 
         # Threshold images to remove background and invert colors
         # TODO: Run below line if pre-processing = False and change path for above line
@@ -89,41 +74,34 @@ def read_data(data_folder_path, out_height, out_width):
         img = np.divide(img.astype(np.float32), 255.0)
 
         # Resize - put a height cap and resize accordingly
-        resize_width = int((img.shape[1] / img.shape[0]) * out_height)
+        out_width = int((img.shape[1] / img.shape[0]) * out_height)
+        img = cv2.resize(img, (out_width, out_height)).astype(np.float32)
+        img = cv2.imencode('.png', img)[1].tostring()
 
-        if resize_width < out_width:
-            img_width = resize_width
-            img = cv2.resize(img, (resize_width, out_height)).astype(np.float32)
-            img = np.pad(img, ((0,0), (0, out_width-resize_width)), mode='constant')
-        else:
-            img_width = out_width
-            img = cv2.resize(img, (out_width, out_height))
+        example_img = tf.train.Example(features=tf.train.Features(feature={
+            'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img])),
+            'label': tf.train.Feature(int64_list=tf.train.Int64List(value=lab)),
+            'width': tf.train.Feature(float_list=tf.train.FloatList(value=[out_width])),
+            'lab_length': tf.train.Feature(float_list=tf.train.FloatList(value=[len(lab)]))
+        }))
 
-        return img, img_width
+        return example_img
 
-    train_im_num, val_im_num, test_im_num = 0, 0, 0
-    for im_id in tqdm(train_ids+val_ids+test_ids):
-        im, im_width = read_img(im_id)
-        lab = np.array(line_data[im_id][1], dtype=np.int32)
-
-        if im_id in train_ids:
-            train_im_widths[train_p[train_im_num]] = im_width
-            train_lab_lengths[train_p[train_im_num]] = len(lab)
-            train_images[train_p[train_im_num]] = im
-            train_labels[train_p[train_im_num]] = lab
-            train_im_num += 1
-        elif im_id in val_ids:
-            val_im_widths[val_p[val_im_num]] = im_width
-            val_lab_lengths[val_p[val_im_num]] = len(lab)
-            val_images[val_p[val_im_num]] = im
-            val_labels[val_p[val_im_num]] = lab
-            val_im_num += 1
-        elif im_id in test_ids:
-            test_im_widths[test_p[test_im_num]] = im_width
-            test_lab_lengths[test_p[test_im_num]] = len(lab)
-            test_images[test_p[test_im_num]] = im
-            test_labels[test_p[test_im_num]] = lab
-            test_im_num += 1
+    print('Training Data')
+    with tf.python_io.TFRecordWriter(out_name+'_train.tfrecords') as writer:
+        for im_id in tqdm(train_ids):
+            example = convert_image(im_id, line_data)
+            writer.write(example.SerializeToString())
+    print('Validation Data')
+    with tf.python_io.TFRecordWriter(out_name+'_val.tfrecords') as writer:
+        for im_id in tqdm(val_ids):
+            example = convert_image(im_id, line_data)
+            writer.write(example.SerializeToString())
+    print('Test Data')
+    with tf.python_io.TFRecordWriter(out_name+'_test.tfrecords') as writer:
+        for im_id in tqdm(test_ids):
+            example = convert_image(im_id, line_data)
+            writer.write(example.SerializeToString())
 
     # train_labels_sparse, val_labels_sparse = sparse_tuple_from(train_labels), sparse_tuple_from(val_labels)
     # test_labels_sparse = sparse_tuple_from(test_labels)
@@ -132,36 +110,21 @@ def read_data(data_folder_path, out_height, out_width):
     print(f'Validation Samples = {len(val_ids)}')
     print(f'Test Samples = {len(test_ids)}')
 
-    return {'train': {'images': train_images, 'labels': train_labels,
-                      'im_widths': train_im_widths, 'lab_lengths': train_lab_lengths},
-            'validation': {'images': val_images, 'labels': val_labels,
-                           'im_widths': val_im_widths, 'lab_lengths': val_lab_lengths},
-            'test': {'images': test_images, 'labels': test_labels,
-                     'im_widths': test_im_widths, 'lab_lengths': test_lab_lengths},
-            'num_chars' : num_chars, 'char_map': char_map}
-
 
 if __name__ == '__main__':
     # Construct the argument parse and parse the arguments
     ap = argparse.ArgumentParser()
     ap.add_argument("-i", "--data_dir", required=False,
-                    help="Path of folder with lines.txt, lines & largeWriterIndependentTextLineRecognitionTask folders")
+                    help="Path of folder with lines.txt, lines & aachen_partition folders")
     ap.add_argument("-oh", "--out_height", required=False, type=int, help="Height of the output image")
-    ap.add_argument("-ow", "--out_width", required=False, type=int, help="Width of the output image")
     ap.add_argument("-o", "--output", required=False,
-                    help="Output directory and name for pickle file (do not include extension)")
+                    help="Output directory and name for tfrecords file (do not include extension)")
     args = vars(ap.parse_args())
 
     data_dir = './IAM/' if args['data_dir'] is None else args['data_dir']
     height = 64 if args['out_height'] is None else args['out_height']
-    width = 1280 if args['out_width'] is None else args['out_width']
     output = './iam' if args['output'] is None else args['output']
 
     print('Loading Data:')
-    data = read_data(data_folder_path=data_dir, out_height=height, out_width=width)
-
-    print('Saving Data')
-    out_name = output + '_h' + str(height) + '_w' + str(width) + '.pickle'
-    with open(out_name, 'wb') as f:
-        pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+    read_data(data_folder_path=data_dir, out_height=height, out_name=output + '_h' + str(height))
     print('Completed')
