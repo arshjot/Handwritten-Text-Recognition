@@ -5,55 +5,54 @@ import tensorflow as tf
 class DataGenerator:
     def __init__(self, config):
         self.config = config
-        # load data here
-        with open('../data/iam_h' + str(config.im_height) + '_w' + str(config.im_width) + '.pickle', 'rb') as f:
+        # Load data
+        with open('../data/iam_h' + str(config.im_height) + '_char_map.pkl', 'rb') as f:
             data = pickle.load(f)
-        train, val = data['train'], data['validation']
-        self.train_label, self.val_label = train['labels'], val['labels']
-        self.char_map_inv = {i: j for j, i in data['char_map'].items()}
+        char_map = data['char_map']
+        self.char_map_inv = {i: j for j, i in char_map.items()}
+        self.train_dataset = tf.data.TFRecordDataset('../data/iam_h' + str(config.im_height) + '_train.tfrecords')
+        self.val_dataset = tf.data.TFRecordDataset('../data/iam_h' + str(config.im_height) + '_val.tfrecords')
+        self.test_dataset = tf.data.TFRecordDataset('../data/iam_h' + str(config.im_height) + '_test.tfrecords')
 
-        self.train_dataset = tf.data.Dataset.from_tensor_slices(
-            (train['images'], train['im_widths'], train['lab_lengths']))
-        train_label_dataset = tf.data.Dataset.from_generator(
-            self.train_generator, output_types=tf.int32, output_shapes=(tf.TensorShape([None])))
-        self.train_dataset = tf.data.Dataset.zip((self.train_dataset, train_label_dataset))
-        self.train_dataset = self.train_dataset.shuffle(buffer_size=500, seed=42)
+        # Parse and batch
+        padded_shapes = ((tf.TensorShape([self.config.im_height, None])),
+                         (tf.TensorShape([None])), (tf.TensorShape([])), (tf.TensorShape([])))
+        padding_values = ((tf.constant(0.0)), (tf.constant(0)), (tf.constant(0)), (tf.constant(-1)))
+        self.train_dataset = self.train_dataset.map(self.parser, num_parallel_calls=self.config.batch_size)\
+            .shuffle(buffer_size=500, seed=42)\
+            .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
+        self.val_dataset = self.val_dataset.map(self.parser, num_parallel_calls=self.config.batch_size)\
+            .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
+        self.test_dataset = self.test_dataset.map(self.parser, num_parallel_calls=self.config.batch_size)\
+            .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
 
-        self.val_dataset = tf.data.Dataset.from_tensor_slices((val['images'], val['im_widths'], val['lab_lengths']))
-        val_label_dataset = tf.data.Dataset.from_generator(
-            self.val_generator, output_types=tf.int32, output_shapes=(tf.TensorShape([None])))
-        self.val_dataset = tf.data.Dataset.zip((self.val_dataset, val_label_dataset))
-
-        self.train_dataset = self.train_dataset.padded_batch(
-            self.config.batch_size,
-            padded_shapes=((tf.TensorShape([self.config.im_height, self.config.im_width]),
-                            tf.TensorShape([]), tf.TensorShape([])), tf.TensorShape([None])),
-            padding_values=((tf.constant(0.0), tf.constant(0), tf.constant(0)), tf.constant(-1)))
-        self.train_dataset = self.train_dataset.prefetch(tf.contrib.data.AUTOTUNE)
-
-        self.val_dataset = self.val_dataset.padded_batch(
-            self.config.batch_size,
-            padded_shapes=((tf.TensorShape([self.config.im_height, self.config.im_width]),
-                            tf.TensorShape([]), tf.TensorShape([])), tf.TensorShape([None])),
-            padding_values=((tf.constant(0.0), tf.constant(0), tf.constant(0)), tf.constant(-1)))
-        self.val_dataset = self.val_dataset.prefetch(tf.contrib.data.AUTOTUNE)
-
+        # Batch
         self.iterator = tf.data.Iterator.from_structure(
             self.train_dataset.output_types, self.train_dataset.output_shapes)
         self.training_init_op = self.iterator.make_initializer(self.train_dataset)
         self.validation_init_op = self.iterator.make_initializer(self.val_dataset)
 
         self.num_classes = data['num_chars']
-        self.num_iterations_train = len(train['images']) // self.config.batch_size
-        self.num_iterations_val = len(val['images']) // self.config.batch_size
+        self.num_iterations_train = data['len_train'] // self.config.batch_size
+        self.num_iterations_val = data['len_val'] // self.config.batch_size
 
-    def train_generator(self):
-        for el in self.train_label:
-            yield el
+    def parser(self, record):
+        keys_to_features = {
+            'image_raw': tf.FixedLenFeature((), tf.string),
+            'label': tf.VarLenFeature(tf.int64),
+            'width': tf.FixedLenFeature((), tf.int64),
+            'lab_length': tf.FixedLenFeature((), tf.int64),
+        }
+        parsed = tf.parse_single_example(record, keys_to_features)
+        image = tf.image.decode_png(parsed['image_raw'], 1, tf.uint8)
+        label = tf.sparse.to_dense(tf.cast(parsed['label'], tf.int32))
+        lab_length = tf.cast(parsed['lab_length'], tf.int32)
+        height = tf.constant(self.config.im_height, tf.int32)
+        width = tf.cast(parsed['width'], tf.int32)
+        image = tf.reshape(image, [height, width])
+        image = tf.cast(image, tf.float32)
 
-    def val_generator(self):
-        for el in self.val_label:
-            yield el
+        return image, label, width, lab_length
 
     def initialize(self, sess, is_train):
         if is_train:
@@ -67,16 +66,14 @@ class DataGenerator:
 
 def main():
     class Config:
-        im_height = 40
-        im_width = 800
-        batch_size = 1
+        im_height = 64
+        batch_size = 2
 
     tf.reset_default_graph()
     sess = tf.Session()
 
     data_loader = DataGenerator(Config)
-    x, y = data_loader.get_input()
-    x_im, x_w, x_len = x
+    x_im, y, x_w, x_len = data_loader.get_input()
 
     data_loader.initialize(sess, is_train=True)
     out_x_im, out_x_w, out_x_len, out_y = sess.run([x_im, x_w, x_len, y])
