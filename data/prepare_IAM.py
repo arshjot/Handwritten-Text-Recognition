@@ -125,7 +125,7 @@ if __name__ == '__main__':
     args = vars(ap.parse_args())
 
     data_dir = './IAM/' if args['data_dir'] is None else args['data_dir']
-    height = 64 if args['out_height'] is None else args['out_height']
+    height = 128 if args['out_height'] is None else args['out_height']
     output = './iam' if args['output'] is None else args['output']
 
     print('Loading Data:')
