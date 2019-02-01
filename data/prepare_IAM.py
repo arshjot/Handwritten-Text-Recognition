@@ -22,6 +22,7 @@ import numpy as np
 from tqdm import tqdm
 import argparse
 import tensorflow as tf
+import pickle as pkl
 
 
 def read_data(data_folder_path, out_height, out_name):
@@ -79,10 +80,10 @@ def read_data(data_folder_path, out_height, out_name):
         img = cv2.imencode('.png', img)[1].tostring()
 
         example_img = tf.train.Example(features=tf.train.Features(feature={
-            'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img])),
+            'image_raw': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img])),
             'label': tf.train.Feature(int64_list=tf.train.Int64List(value=lab)),
-            'width': tf.train.Feature(float_list=tf.train.FloatList(value=[out_width])),
-            'lab_length': tf.train.Feature(float_list=tf.train.FloatList(value=[len(lab)]))
+            'width': tf.train.Feature(int64_list=tf.train.Int64List(value=[out_width])),
+            'lab_length': tf.train.Feature(int64_list=tf.train.Int64List(value=[len(lab)]))
         }))
 
         return example_img
@@ -103,8 +104,10 @@ def read_data(data_folder_path, out_height, out_name):
             example = convert_image(im_id, line_data)
             writer.write(example.SerializeToString())
 
-    # train_labels_sparse, val_labels_sparse = sparse_tuple_from(train_labels), sparse_tuple_from(val_labels)
-    # test_labels_sparse = sparse_tuple_from(test_labels)
+    with open(out_name+'_char_map.pkl', 'wb') as f:
+        pkl.dump({'char_map': char_map, 'num_chars': num_chars, 'len_train': len(train_ids),
+                 'len_val': len(val_ids), 'len_test': len(test_ids)}, f, protocol=pkl.HIGHEST_PROTOCOL)
+
     print(f'Number of characters = {num_chars}')
     print(f'Training Samples = {len(train_ids)}')
     print(f'Validation Samples = {len(val_ids)}')
