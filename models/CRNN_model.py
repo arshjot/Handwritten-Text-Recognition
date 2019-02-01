@@ -46,9 +46,8 @@ class Model(BaseModel):
 
         # Inputs to the network
         with tf.variable_scope('inputs'):
-            self.x, y = self.data_loader.get_input()
+            self.x, y, self.length, self.lab_length = self.data_loader.get_input()
             self.y = tf.contrib.layers.dense_to_sparse(y, eos_token=-1)
-            self.x, self.length, self.lab_length = self.x
             self.length = tf.div(self.length, tf.constant(self.reduce_factor, dtype=tf.int32))
             self.x = tf.expand_dims(self.x, 3)
             self.is_training = tf.placeholder(tf.bool, name='Training_flag')
