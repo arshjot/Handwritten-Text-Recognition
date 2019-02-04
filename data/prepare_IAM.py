@@ -23,13 +23,14 @@ from tqdm import tqdm
 import argparse
 import tensorflow as tf
 import pickle as pkl
+import re
 
 
 def read_data(data_folder_path, out_height, out_name):
     """
     Return consolidated and preprocessed images, labels, image widths (without pad) and image label lengths
     split into training, validation and test sets
-    Validation Set 2 will be added to Test Set
+    Aachen Partition will be used for splitting training, validation and test sets
 
     Arguments:
     data_folder_path : Path of folder with lines.txt, 'lines' & 'largeWriterIndependentTextLineRecognitionTask' folders
@@ -42,27 +43,38 @@ def read_data(data_folder_path, out_height, out_name):
         char = f.read().decode('unicode_escape')
         line_raw = char[1025:].splitlines()
 
-    # Create dictionary of the format {line_id : [graylevel_for_binarizing, label_in_ascii]}
-    # Lines with error in segmentation will be excluded
-    chars = np.unique(np.concatenate([[char for char in line.split()[8]]
-                                      for line in line_raw if line.split()[1] == 'ok']))
+    # Create dictionary of the format {line_id : [graylevel_for_binarizing, label_as_numeric]}
+    # 1. Remove spaces within words
+    # 2. Replace "|" with whitespace
+    # 3. Remove separations from contractions ("We 'll" -> "We'll")
+    def collapse_contraction(match_pattern, string):
+        return ''.join([j[1:] if match_pattern.match(j) else j for j in [i for i in match_pattern.split(string) if i]])
+
+    patterns_list = [r'( \'t)', r'( \'m)', r'( \'ll)', r'( \'ve)', r'( \'s)', r'(\'re)', r'( \'d)', r'( \'T)',
+                     r'( \'M)', r'( \'LL)', r'( \'VE)', r'( \'S)', r'(\'RE)', r'( \'D)']
+    pattern = re.compile('|'.join(patterns_list))
+
+    line_raw = [line.split() for line in line_raw]
+    line_raw = [i[:8]+[collapse_contraction(pattern, ''.join(i[8:]).replace('|', ' '))] for i in line_raw]
+
+    chars = np.unique(np.concatenate([[char for char in line[8]] for line in line_raw]))
     char_map = {value: idx for (idx, value) in enumerate(chars)}
     char_map['<BLANK>'] = len(char_map)
     num_chars = len(char_map.keys())
 
-    line_data = {line.split()[0]: [int(line.split()[2]), [char_map[char] for char in line.split()[8]]]
-                 for line in line_raw if line.split()[1] == 'ok'}
+    line_data = {line[0]: [int(line[2]), [char_map[char] for char in line[8]]]
+                 for line in line_raw}
 
     # Extract IDs for test, train and val sets
     with open(data_folder_path + '/aachen_partition/tr.lst', 'rb') as f:
         ids = f.read().decode('unicode_escape')
-        train_ids = [i for i in ids.splitlines() if i in list(line_data.keys())]
+        train_ids = [i for i in ids.splitlines()]
     with open(data_folder_path + '/aachen_partition/va.lst', 'rb') as f:
         ids = f.read().decode('unicode_escape')
-        val_ids = [i for i in ids.splitlines() if i in list(line_data.keys())]
+        val_ids = [i for i in ids.splitlines()]
     with open(data_folder_path + '/aachen_partition/te.lst', 'rb') as f:
         ids = f.read().decode('unicode_escape')
-        test_ids = [i for i in ids.splitlines() if i in list(line_data.keys())]
+        test_ids = [i for i in ids.splitlines()]
 
     def convert_image(img_id, lines_data):
         img = cv2.imread(data_folder_path + '/processed_lines/' + img_id + '.png', 0)

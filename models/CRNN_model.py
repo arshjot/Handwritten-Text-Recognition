@@ -7,15 +7,11 @@ class Model(BaseModel):
     def __init__(self, data_loader, config):
         super(Model, self).__init__(config)
         self.rnn_num_hidden = 256
-        self.rnn_num_layers = 4
-        self.conv1_patch_size = 3
-        self.conv2_patch_size = 3
-        self.conv3_patch_size = 3
-        self.conv4_patch_size = 3
-        self.conv1_depth = 12
-        self.conv2_depth = 24
-        self.conv3_depth = 48
-        self.conv4_depth = 96
+        self.rnn_num_layers = 5
+        self.rnn_dropout = 0.5
+        self.conv_patch_sizes = [3] * 5
+        self.conv_depths = [16, 32, 48, 64, 80]
+        self.conv_dropouts = [0, 0, 0.2, 0.2, 0.2]
         self.reduce_factor = 8
 
         # Get the data_loader to make the joint of the inputs in the graph
@@ -65,33 +61,46 @@ class Model(BaseModel):
         out_b = tf.Variable(tf.constant(0., shape=[self.data_loader.num_classes]), name='out_b')
 
         # CNNs
-        # ==================1==================
-        conv1_out = tf.layers.conv2d(self.x, self.conv1_depth, self.conv1_patch_size, padding='same',
-                                     activation=tf.nn.leaky_relu, kernel_initializer=intitalizer, name='cnn_1')
-        conv1_out = tf.layers.max_pooling2d(conv1_out, 2, 2, padding='same', name='pool_1')
+        with tf.name_scope('CNN_Block_1'):
+            conv1_out = tf.layers.conv2d(self.x, self.conv_depths[0], self.conv_patch_sizes[0], padding='same',
+                                         activation=tf.nn.leaky_relu, kernel_initializer=intitalizer)
+            conv1_out = tf.layers.max_pooling2d(conv1_out, 2, 2, padding='same')
+            conv1_out = tf.layers.dropout(conv1_out, self.conv_dropouts[0], training=self.is_training)
+            conv1_out = tf.layers.batch_normalization(conv1_out)
 
-        # ==================2==================
-        conv2_out = tf.layers.conv2d(conv1_out, self.conv2_depth, self.conv2_patch_size, padding='same',
-                                     activation=tf.nn.leaky_relu, kernel_initializer=intitalizer, name='cnn_2')
-        conv2_out = tf.layers.max_pooling2d(conv2_out, 2, 2, padding='same', name='pool_2')
+        with tf.name_scope('CNN_Block_2'):
+            conv2_out = tf.layers.conv2d(conv1_out, self.conv_depths[1], self.conv_patch_sizes[1], padding='same',
+                                         activation=tf.nn.leaky_relu, kernel_initializer=intitalizer)
+            conv2_out = tf.layers.max_pooling2d(conv2_out, 2, 2, padding='same')
+            conv2_out = tf.layers.dropout(conv2_out, self.conv_dropouts[1], training=self.is_training)
+            conv2_out = tf.layers.batch_normalization(conv2_out)
 
-        # ==================3==================
-        conv3_out = tf.layers.conv2d(conv2_out, self.conv3_depth, self.conv3_patch_size, padding='same',
-                                     activation=tf.nn.leaky_relu, kernel_initializer=intitalizer, name='cnn_3')
-        conv3_out = tf.layers.max_pooling2d(conv3_out, 2, 2, padding='same', name='pool_3')
+        with tf.name_scope('CNN_Block_3'):
+            conv3_out = tf.layers.conv2d(conv2_out, self.conv_depths[2], self.conv_patch_sizes[2], padding='same',
+                                         activation=tf.nn.leaky_relu, kernel_initializer=intitalizer)
+            conv3_out = tf.layers.max_pooling2d(conv3_out, 2, 2, padding='same')
+            conv3_out = tf.layers.dropout(conv3_out, self.conv_dropouts[2], training=self.is_training)
+            conv3_out = tf.layers.batch_normalization(conv3_out)
 
-        # ==================4==================
-        conv4_out = tf.layers.conv2d(conv3_out, self.conv4_depth, self.conv4_patch_size, padding='same',
-                                     activation=tf.nn.leaky_relu, kernel_initializer=intitalizer, name='cnn_4')
+        with tf.name_scope('CNN_Block_4'):
+            conv4_out = tf.layers.conv2d(conv3_out, self.conv_depths[3], self.conv_patch_sizes[3], padding='same',
+                                         activation=tf.nn.leaky_relu, kernel_initializer=intitalizer)
+            conv4_out = tf.layers.dropout(conv4_out, self.conv_dropouts[3], training=self.is_training)
+            conv4_out = tf.layers.batch_normalization(conv4_out)
 
-        cnn_out = tf.reduce_sum(conv4_out, axis=1)
+        with tf.name_scope('CNN_Block_5'):
+            conv5_out = tf.layers.conv2d(conv4_out, self.conv_depths[4], self.conv_patch_sizes[4], padding='same',
+                                         activation=tf.nn.leaky_relu, kernel_initializer=intitalizer)
+            conv5_out = tf.layers.dropout(conv5_out, self.conv_dropouts[4], training=self.is_training)
+            conv5_out = tf.layers.batch_normalization(conv5_out)
+
+        cnn_out = tf.reduce_sum(conv5_out, axis=1)
         cnn_out = tf.transpose(cnn_out, [1, 0, 2])
-        cnn_out = tf.layers.dropout(cnn_out, 0.8, training=self.is_training, name='drop_cnn')
 
         # RNN
-        with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE) as sc:
+        with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE):
             lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
-                                                  'linear_input', 'bidirectional', name=sc)
+                                                  'linear_input', 'bidirectional', self.rnn_dropout)
             output, state = lstm(cnn_out)
 
         # Fully Connected
@@ -117,8 +126,7 @@ class Model(BaseModel):
         with tf.variable_scope('train_step'):
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             with tf.control_dependencies(update_ops):
-                self.train_step = tf.train.RMSPropOptimizer(learning_rate=self.config.learning_rate).minimize(
-                    self.loss, global_step=self.global_step_tensor)
+                self.train_step = tf.train.AdamOptimizer().minimize(self.loss, global_step=self.global_step_tensor)
 
         tf.add_to_collection('train', self.train_step)
         tf.add_to_collection('train', self.cost)
