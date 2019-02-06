@@ -67,6 +67,7 @@ class DataGenerator:
             aug_img.random_dilation(prob=0.5)
             aug_img.random_erosion(prob=0.5)
             image = aug_img.image
+            width = aug_img.width
 
         image = tf.reshape(image, [height, width])
         return image, label, lab_length
