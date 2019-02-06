@@ -1,15 +1,15 @@
 {
-  "exp_name": "BLSTM_h128_processed",
+  "exp_name": "CRNN_h128",
   "train_from_start": 1,
   "random_prediction": 1,
 
-  "architecture": "BLSTM",
+  "architecture": "CRNN",
 
   "im_height": 128,
 
   "batch_size": 1,
   "num_epochs": 80,
-  "learning_rate": 0.00027,
+  "learning_rate": 0.0003,
 
   "max_to_keep": 2
 }
