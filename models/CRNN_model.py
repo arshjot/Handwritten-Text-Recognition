@@ -114,7 +114,7 @@ class Model(BaseModel):
             output = tf.concat(output, 2)
             # Linear dropout
             output = tf.layers.dropout(output, self.linear_dropout, noise_shape=tf.constant(
-                value=[self.config.batch_size, 1, 2*self.rnn_num_hidden]), training=self.is_training)
+                value=[1, self.config.batch_size, 2*self.rnn_num_hidden]), training=self.is_training)
             # Reshaping to apply the same weights over the timesteps
             output = tf.reshape(output, [-1, 2*self.rnn_num_hidden])
             # Doing the affine projection
