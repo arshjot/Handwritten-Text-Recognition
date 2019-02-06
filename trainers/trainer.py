@@ -46,9 +46,9 @@ class Trainer(BaseTrain):
             # Beam search prediction at every 10th step only - to improve training speed
             if _ % 10 == 0:
                 loss, cer = self.train_step()
-                cers.append(cer)
+                cers += list(cer)
                 losses.append(loss)
-                progbar.update(_, values=[('loss', loss), ('cer', cer)])
+                progbar.update(_, values=[('loss', loss), ('cer', np.mean(cer))])
             else:
                 loss = self.train_step(get_err=False)
                 progbar.update(_, values=[('loss', loss)])
@@ -101,7 +101,7 @@ class Trainer(BaseTrain):
                 loss, cer = self.sess.run([self.loss_node, self.acc_node],
                                           feed_dict={self.is_training: False})
             losses.append(loss)
-            cers.append(cer)
+            cers += list(cer)
         loss = np.mean(losses)
         cer = np.mean(cers)
 
@@ -119,6 +119,6 @@ class Trainer(BaseTrain):
             for idx, val in enumerate(predictions[0][0].indices):
                 pred[val[0]][val[1]] = predictions[0][0].values[idx]
             pred = ''.join([self.data_loader.char_map_inv[i] for i in pred[0]])
-            end_idx = np.where(label[0] == -1)[0][0] if len(np.where(label[0] == -1)[0])!=0 else len(label[0])
+            end_idx = np.where(label[0] == -1)[0][0] if len(np.where(label[0] == -1)[0]) != 0 else len(label[0])
             label = ''.join([self.data_loader.char_map_inv[i] for i in label[0][:end_idx]])
             print("Label: {}\nPrediction: {}".format(label, pred))
