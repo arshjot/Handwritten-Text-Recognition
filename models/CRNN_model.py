@@ -43,8 +43,9 @@ class Model(BaseModel):
 
         # Inputs to the network
         with tf.variable_scope('inputs'):
-            self.x, y, self.length, self.lab_length = self.data_loader.get_input()
+            self.x, y, self.lab_length = self.data_loader.get_input()
             self.y = tf.contrib.layers.dense_to_sparse(y, eos_token=-1)
+            self.length = tf.fill([self.config.batch_size], tf.shape(self.x)[2])
             self.length = tf.div(self.length, tf.constant(self.reduce_factor, dtype=tf.int32))
             self.x = tf.expand_dims(self.x, 3)
             self.is_training = tf.placeholder(tf.bool, name='Training_flag')
@@ -135,7 +136,8 @@ class Model(BaseModel):
         with tf.variable_scope('train_step'):
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             with tf.control_dependencies(update_ops):
-                self.train_step = tf.train.AdamOptimizer().minimize(self.loss, global_step=self.global_step_tensor)
+                self.train_step = tf.train.RMSPropOptimizer(learning_rate=self.config.learning_rate).minimize(
+                    self.loss, global_step=self.global_step_tensor)
 
         tf.add_to_collection('train', self.train_step)
         tf.add_to_collection('train', self.cost)

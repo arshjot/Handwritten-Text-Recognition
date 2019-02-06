@@ -22,8 +22,8 @@ class DataGenerator:
 
         # Parse, augment (if training set) and batch
         padded_shapes = ((tf.TensorShape([self.config.im_height, None])),
-                         (tf.TensorShape([None])), (tf.TensorShape([])), (tf.TensorShape([])))
-        padding_values = ((tf.constant(0.0)), (tf.constant(0)), (tf.constant(0)), (tf.constant(-1)))
+                         (tf.TensorShape([None])), (tf.TensorShape([])))
+        padding_values = ((tf.constant(0.0)), (tf.constant(0)), (tf.constant(-1)))
         self.train_dataset = self.train_dataset.map(lambda x: self.parser(x, True), num_parallel_calls=self.config.batch_size)\
             .shuffle(buffer_size=500)\
             .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
@@ -67,10 +67,9 @@ class DataGenerator:
             aug_img.random_dilation(prob=0.5)
             aug_img.random_erosion(prob=0.5)
             image = aug_img.image
-            width = aug_img.width
 
         image = tf.reshape(image, [height, width])
-        return image, label, width, lab_length
+        return image, label, lab_length
 
     def initialize(self, sess, is_train):
         if is_train:
