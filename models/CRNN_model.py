@@ -12,6 +12,7 @@ class Model(BaseModel):
         self.conv_patch_sizes = [3] * 5
         self.conv_depths = [16, 32, 48, 64, 80]
         self.conv_dropouts = [0, 0, 0.2, 0.2, 0.2]
+        self.linear_dropout = 0.5
         self.reduce_factor = 8
 
         # Get the data_loader to make the joint of the inputs in the graph
@@ -65,33 +66,38 @@ class Model(BaseModel):
             conv1_out = tf.layers.conv2d(self.x, self.conv_depths[0], self.conv_patch_sizes[0], padding='same',
                                          activation=tf.nn.leaky_relu, kernel_initializer=intitalizer)
             conv1_out = tf.layers.max_pooling2d(conv1_out, 2, 2, padding='same')
-            conv1_out = tf.layers.dropout(conv1_out, self.conv_dropouts[0], training=self.is_training)
+            conv1_out = tf.layers.dropout(conv1_out, self.conv_dropouts[0], noise_shape=tf.constant(
+                value=[self.config.batch_size, 1, 1, self.conv_depths[0]]), training=self.is_training)
             conv1_out = tf.layers.batch_normalization(conv1_out)
 
         with tf.name_scope('CNN_Block_2'):
             conv2_out = tf.layers.conv2d(conv1_out, self.conv_depths[1], self.conv_patch_sizes[1], padding='same',
                                          activation=tf.nn.leaky_relu, kernel_initializer=intitalizer)
             conv2_out = tf.layers.max_pooling2d(conv2_out, 2, 2, padding='same')
-            conv2_out = tf.layers.dropout(conv2_out, self.conv_dropouts[1], training=self.is_training)
+            conv2_out = tf.layers.dropout(conv2_out, self.conv_dropouts[1], noise_shape=tf.constant(
+                value=[self.config.batch_size, 1, 1, self.conv_depths[1]]), training=self.is_training)
             conv2_out = tf.layers.batch_normalization(conv2_out)
 
         with tf.name_scope('CNN_Block_3'):
             conv3_out = tf.layers.conv2d(conv2_out, self.conv_depths[2], self.conv_patch_sizes[2], padding='same',
                                          activation=tf.nn.leaky_relu, kernel_initializer=intitalizer)
             conv3_out = tf.layers.max_pooling2d(conv3_out, 2, 2, padding='same')
-            conv3_out = tf.layers.dropout(conv3_out, self.conv_dropouts[2], training=self.is_training)
+            conv3_out = tf.layers.dropout(conv3_out, self.conv_dropouts[2], noise_shape=tf.constant(
+                value=[self.config.batch_size, 1, 1, self.conv_depths[2]]), training=self.is_training)
             conv3_out = tf.layers.batch_normalization(conv3_out)
 
         with tf.name_scope('CNN_Block_4'):
             conv4_out = tf.layers.conv2d(conv3_out, self.conv_depths[3], self.conv_patch_sizes[3], padding='same',
                                          activation=tf.nn.leaky_relu, kernel_initializer=intitalizer)
-            conv4_out = tf.layers.dropout(conv4_out, self.conv_dropouts[3], training=self.is_training)
+            conv4_out = tf.layers.dropout(conv4_out, self.conv_dropouts[3], noise_shape=tf.constant(
+                value=[self.config.batch_size, 1, 1, self.conv_depths[3]]), training=self.is_training)
             conv4_out = tf.layers.batch_normalization(conv4_out)
 
         with tf.name_scope('CNN_Block_5'):
             conv5_out = tf.layers.conv2d(conv4_out, self.conv_depths[4], self.conv_patch_sizes[4], padding='same',
                                          activation=tf.nn.leaky_relu, kernel_initializer=intitalizer)
-            conv5_out = tf.layers.dropout(conv5_out, self.conv_dropouts[4], training=self.is_training)
+            conv5_out = tf.layers.dropout(conv5_out, self.conv_dropouts[4], noise_shape=tf.constant(
+                value=[self.config.batch_size, 1, 1, self.conv_depths[4]]), training=self.is_training)
             conv5_out = tf.layers.batch_normalization(conv5_out)
 
         cnn_out = tf.reduce_sum(conv5_out, axis=1)
@@ -106,6 +112,9 @@ class Model(BaseModel):
         # Fully Connected
         with tf.name_scope('Dense'):
             output = tf.concat(output, 2)
+            # Linear dropout
+            output = tf.layers.dropout(output, self.linear_dropout, noise_shape=tf.constant(
+                value=[self.config.batch_size, 1, 2*self.rnn_num_hidden]), training=self.is_training)
             # Reshaping to apply the same weights over the timesteps
             output = tf.reshape(output, [-1, 2*self.rnn_num_hidden])
             # Doing the affine projection
