@@ -135,7 +135,8 @@ class Model(BaseModel):
         with tf.variable_scope('train_step'):
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             with tf.control_dependencies(update_ops):
-                self.train_step = tf.train.AdamOptimizer().minimize(self.loss, global_step=self.global_step_tensor)
+                self.train_step = tf.train.RMSPropOptimizer(learning_rate=self.config.learning_rate).minimize(
+                    self.loss, global_step=self.global_step_tensor)
 
         tf.add_to_collection('train', self.train_step)
         tf.add_to_collection('train', self.cost)
