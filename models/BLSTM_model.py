@@ -54,10 +54,11 @@ class Model(BaseModel):
         out_b = tf.Variable(tf.constant(0., shape=[self.data_loader.num_classes]), name='out_b')
 
         # RNN
+        rnn_keep_prob = tf.cond(self.is_training, lambda: 1 - self.rnn_dropout, lambda: 1.0)
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE) as sc:
             if self.config.batch_size == 1:
                 lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
-                                                      'linear_input', 'bidirectional', dropout=self.rnn_dropout)
+                                                      'linear_input', 'bidirectional', dropout=rnn_keep_prob)
                 output, state = lstm(self.x)
             else:
                 stacked_rnn = []
