@@ -38,7 +38,7 @@ class Augmentor:
                                                      [0, 0, 1.0]],
                                         [self.height, self.width])
 
-    def random_rotation(self, prec=500, prob=0.5):
+    def random_rotation(self, prec=100, prob=0.5):
         if np.random.random() < prob:
             rot_factor = np.random.vonmises(mu=0, kappa=prec)
             height_pad = tf.cast(tf.math.scalar_mul(self.width_float, tf.math.sin(tf.constant(rot_factor))), tf.int32)
@@ -50,7 +50,7 @@ class Augmentor:
             self.image = tf.contrib.image.rotate(self.image, rot_factor)
             self.image = tf.image.resize_images(self.image, (self.height, self.width))
 
-    def random_shearing(self, prec=10, prob=0.5):
+    def random_shearing(self, prec=4, prob=0.5):
         if np.random.random() < prob:
             shear_factor = np.random.vonmises(mu=0, kappa=prec)
             self.image = self.transform(self.image, [[1.0, shear_factor, 0],
