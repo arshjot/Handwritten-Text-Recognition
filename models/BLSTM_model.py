@@ -8,6 +8,7 @@ class Model(BaseModel):
         super(Model, self).__init__(config)
         self.rnn_num_hidden = 256
         self.rnn_num_layers = 4
+        self.rnn_dropout = 0.1
 
         # Get the data_loader to make the joint of the inputs in the graph
         self.data_loader = data_loader
@@ -54,9 +55,32 @@ class Model(BaseModel):
 
         # RNN
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE) as sc:
-            lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
-                                                  'linear_input', 'bidirectional', dropout=0.1, name=sc)
-            output, state = lstm(self.x)
+            if self.config.batch_size == 1:
+                lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
+                                                      'linear_input', 'bidirectional', dropout=self.rnn_dropout)
+                output, state = lstm(self.x)
+            else:
+                stacked_rnn = []
+                for i in range(self.rnn_num_layers):
+                    stacked_rnn.append(tf.nn.rnn_cell.DropoutWrapper(
+                        tf.nn.rnn_cell.BasicLSTMCell(num_units=self.rnn_num_hidden, state_is_tuple=True),
+                        input_keep_prob=1.0,
+                        state_keep_prob=1.0,
+                        output_keep_prob=1 - self.rnn_dropout,
+                        variational_recurrent=True,
+                        input_size=self.length,
+                        dtype=tf.float32))
+                with tf.variable_scope('forward') as fw_scope:
+                    cell_fw = tf.nn.rnn_cell.MultiRNNCell(stacked_rnn, state_is_tuple=True)
+                with tf.variable_scope('backward') as bw_scope:
+                    cell_bw = tf.nn.rnn_cell.MultiRNNCell(stacked_rnn, state_is_tuple=True)
+                output, state = tf.nn.bidirectional_dynamic_rnn(
+                    cell_fw,
+                    cell_bw,
+                    inputs=self.x,
+                    dtype=tf.float32,
+                    sequence_length=self.length,
+                    time_major=True)
 
         # Fully Connected
         with tf.name_scope('Dense'):
