@@ -104,29 +104,10 @@ class Model(BaseModel):
         cnn_out = tf.transpose(cnn_out, [1, 0, 2])
 
         # RNN
-        rnn_keep_prob = tf.cond(self.is_training, lambda: 1-self.rnn_dropout, lambda: 1.0)
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE):
-            if self.config.batch_size == 1:
-                lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
-                                                      'linear_input', 'bidirectional', rnn_keep_prob)
-                output, state = lstm(cnn_out)
-            else:
-                stacked_rnn = []
-                for i in range(self.rnn_num_layers):
-                    stacked_rnn.append(tf.nn.rnn_cell.DropoutWrapper(
-                        tf.nn.rnn_cell.LSTMCell(num_units=self.rnn_num_hidden, state_is_tuple=True),
-                        input_keep_prob=rnn_keep_prob))
-                with tf.variable_scope('forward') as fw_scope:
-                    cell_fw = tf.nn.rnn_cell.MultiRNNCell(stacked_rnn, state_is_tuple=True)
-                with tf.variable_scope('backward') as bw_scope:
-                    cell_bw = tf.nn.rnn_cell.MultiRNNCell(stacked_rnn, state_is_tuple=True)
-                output, state = tf.nn.bidirectional_dynamic_rnn(
-                    cell_fw,
-                    cell_bw,
-                    inputs=cnn_out,
-                    dtype=tf.float32,
-                    sequence_length=self.length,
-                    time_major=True)
+            lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
+                                                  'linear_input', 'bidirectional', self.rnn_dropout)
+            output, state = lstm(cnn_out)
 
         # Fully Connected
         with tf.name_scope('Dense'):
