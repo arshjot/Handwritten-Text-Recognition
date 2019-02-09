@@ -53,10 +53,15 @@ class Model(BaseModel):
         out_b = tf.Variable(tf.constant(0., shape=[self.data_loader.num_classes]), name='out_b')
 
         # RNN
-        with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE) as sc:
-            lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
-                                                  'linear_input', 'bidirectional', dropout=0.1, name=sc)
-            output, state = lstm(self.x)
+        output = self.x
+        with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE):
+            for i in range(self.rnn_num_layers):
+                lstm = tf.contrib.cudnn_rnn.CudnnLSTM(1, self.rnn_num_hidden, 'linear_input', 'bidirectional')
+                output, state = lstm(output)
+                if i < self.rnn_num_layers - 1:
+                    output = tf.layers.dropout(output, self.rnn_dropout, noise_shape=tf.constant(
+                        value=[1, self.config.batch_size, 2 * self.rnn_num_hidden]), training=self.is_training)
+
 
         # Fully Connected
         with tf.name_scope('Dense'):

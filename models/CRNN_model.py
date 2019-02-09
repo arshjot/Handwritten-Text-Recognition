@@ -101,13 +101,16 @@ class Model(BaseModel):
             conv5_out = tf.layers.batch_normalization(conv5_out)
 
         cnn_out = tf.reduce_sum(conv5_out, axis=1)
-        cnn_out = tf.transpose(cnn_out, [1, 0, 2])
+        output = tf.transpose(cnn_out, [1, 0, 2])
 
         # RNN
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE):
-            lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
-                                                  'linear_input', 'bidirectional', self.rnn_dropout)
-            output, state = lstm(cnn_out)
+            for i in range(self.rnn_num_layers):
+                lstm = tf.contrib.cudnn_rnn.CudnnLSTM(1, self.rnn_num_hidden, 'linear_input', 'bidirectional')
+                output, state = lstm(output)
+                if i < self.rnn_num_layers - 1:
+                    output = tf.layers.dropout(output, self.rnn_dropout, noise_shape=tf.constant(
+                        value=[1, self.config.batch_size, 2 * self.rnn_num_hidden]), training=self.is_training)
 
         # Fully Connected
         with tf.name_scope('Dense'):
