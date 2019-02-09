@@ -20,7 +20,7 @@ class Model(BaseModel):
 
         # define some important variables
         self.x, self.y, self.length, self.lab_length = None, None, None, None
-        self.is_training = None
+        self.is_training, self.is_training_py = None, None
         self.prediction = None
         self.loss = None
         self.ler = None
@@ -107,7 +107,7 @@ class Model(BaseModel):
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE):
             lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
                                                   'linear_input', 'bidirectional', self.rnn_dropout)
-            output, state = lstm(cnn_out)
+            output, state = lstm(cnn_out, training=self.is_training_py)
 
         # Fully Connected
         with tf.name_scope('Dense'):

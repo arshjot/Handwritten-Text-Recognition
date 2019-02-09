@@ -13,7 +13,7 @@ class Trainer(BaseTrain):
         # Summarizer
         self.summarizer = logger
 
-        self.x, self.length, self.lab_length,  self.y, self.is_training = tf.get_collection('inputs')
+        self.x, self.length, self.lab_length, self.y, self.is_training = tf.get_collection('inputs')
         self.train_op, self.loss_node, self.acc_node = tf.get_collection('train')
         self.pred = self.model.prediction
 
@@ -23,8 +23,10 @@ class Trainer(BaseTrain):
         Looping on the epochs
         """
         for cur_epoch in range(self.model.cur_epoch_tensor.eval(self.sess), self.config.num_epochs, 1):
+            self.model.is_training_py = True
             self.train_epoch(cur_epoch)
             self.sess.run(self.model.increment_cur_epoch_tensor)
+            self.model.is_training_py = False
             self.test()
 
     def train_epoch(self, epoch=None):
