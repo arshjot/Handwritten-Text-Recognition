@@ -8,14 +8,13 @@ class Model(BaseModel):
         super(Model, self).__init__(config)
         self.rnn_num_hidden = 256
         self.rnn_num_layers = 4
-        self.rnn_dropout = 0.1
 
         # Get the data_loader to make the joint of the inputs in the graph
         self.data_loader = data_loader
 
         # define some important variables
         self.x, self.y, self.length, self.lab_length = None, None, None, None
-        self.is_training, self.is_training_py = None, None
+        self.is_training = None
         self.prediction = None
         self.loss = None
         self.ler = None
@@ -56,8 +55,8 @@ class Model(BaseModel):
         # RNN
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE) as sc:
             lstm = tf.contrib.cudnn_rnn.CudnnLSTM(self.rnn_num_layers, self.rnn_num_hidden,
-                                                  'linear_input', 'bidirectional', dropout=self.rnn_dropout, name=sc)
-            output, state = lstm(self.x, training=self.is_training_py)
+                                                  'linear_input', 'bidirectional', dropout=0.1, name=sc)
+            output, state = lstm(self.x)
 
         # Fully Connected
         with tf.name_scope('Dense'):
