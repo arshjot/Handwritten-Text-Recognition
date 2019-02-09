@@ -65,9 +65,9 @@ class Augmentor:
             self.image = tf.contrib.image.translate(self.image, [trans_factor_w*self.width_float,
                                                                  trans_factor_h*self.height_float])
 
-    def random_erosion(self, srate=0.8, rrate=1.2, prob=0.5):
+    def random_erosion(self, srate=0.8, rrate=2.2, prob=0.5):
         if np.random.random() < prob:
-            allowed_kernel_sizes = [3, 5, 7, 9, 11, 15]
+            allowed_kernel_sizes = [2, 3]
             kernel_size_probs = np.array([self.geom_prob(k, srate) for k in allowed_kernel_sizes])
             kernel_size_probs /= kernel_size_probs.sum()
             kernel_sizes = np.random.choice(allowed_kernel_sizes, 2, p=kernel_size_probs)
@@ -75,7 +75,8 @@ class Augmentor:
             kernel = tf.convert_to_tensor(np.fromfunction(self.bernoulli_np_value, kernel_shape, dtype=np.float32,
                                                           array_shape=kernel_shape, r=rrate), dtype=tf.float32)
             self.image = tf.expand_dims(self.image, 0)
-            self.image = tf.nn.erosion2d(self.image, kernel, [1, 1, 1, 1], [1, 1, 1, 1], 'SAME')
+            self.image = tf.math.add(tf.nn.erosion2d(self.image, kernel, [1, 1, 1, 1], [1, 1, 1, 1], 'SAME'),
+                                     tf.constant(1.0))
             self.image = self.image[0, :, :, :]
 
     def random_dilation(self, srate=0.4, rrate=1.0, prob=0.5):
@@ -88,5 +89,6 @@ class Augmentor:
             kernel = tf.convert_to_tensor(np.fromfunction(self.bernoulli_np_value, kernel_shape, dtype=np.float32,
                                                           array_shape=kernel_shape, r=rrate), dtype=tf.float32)
             self.image = tf.expand_dims(self.image, 0)
-            self.image = tf.nn.dilation2d(self.image, kernel, [1, 1, 1, 1], [1, 1, 1, 1], 'SAME')
+            self.image = tf.math.add(tf.nn.dilation2d(self.image, kernel, [1, 1, 1, 1], [1, 1, 1, 1], 'SAME'),
+                                     tf.constant(-1.0))
             self.image = self.image[0, :, :, :]
