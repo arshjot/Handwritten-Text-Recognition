@@ -6,6 +6,7 @@ import pickle
 import tensorflow as tf
 from utils.augment import Augmentor
 import matplotlib.pyplot as plt
+tf.set_random_seed(42)
 
 
 class DataGenerator:
@@ -61,10 +62,10 @@ class DataGenerator:
 
         if do_augment:
             aug_img = Augmentor(image, height, width)
-            aug_img.random_translation(prob=0.5)
-            aug_img.random_rotation(prob=0.5)
-            aug_img.random_shearing(prob=0.5)
             aug_img.random_scaling(prob=0.5)
+            aug_img.random_shearing(prob=0.5)
+            aug_img.random_rotation(prob=0.5)
+            aug_img.random_translation(prob=0.5)
             aug_img.random_dilation(prob=0.5)
             aug_img.random_erosion(prob=0.5)
             image = aug_img.image
