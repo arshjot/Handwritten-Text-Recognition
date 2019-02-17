@@ -109,15 +109,13 @@ class Model(BaseModel):
                 lstm = tf.contrib.cudnn_rnn.CudnnLSTM(1, self.rnn_num_hidden, 'linear_input', 'bidirectional')
                 output, state = lstm(output)
                 if i < self.rnn_num_layers - 1:
-                    output = tf.layers.dropout(output, self.rnn_dropout, noise_shape=tf.constant(
-                        value=[1, self.config.batch_size, 2 * self.rnn_num_hidden]), training=self.is_training)
+                    output = tf.layers.dropout(output, self.rnn_dropout, training=self.is_training)
 
         # Fully Connected
         with tf.name_scope('Dense'):
             output = tf.concat(output, 2)
             # Linear dropout
-            output = tf.layers.dropout(output, self.linear_dropout, noise_shape=tf.constant(
-                value=[1, self.config.batch_size, 2*self.rnn_num_hidden]), training=self.is_training)
+            output = tf.layers.dropout(output, self.linear_dropout, training=self.is_training)
             # Reshaping to apply the same weights over the timesteps
             output = tf.reshape(output, [-1, 2*self.rnn_num_hidden])
             # Doing the affine projection
@@ -138,7 +136,8 @@ class Model(BaseModel):
         with tf.variable_scope('train_step'):
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             with tf.control_dependencies(update_ops):
-                self.train_step = tf.train.RMSPropOptimizer(learning_rate=self.config.learning_rate).minimize(
+                self.train_step = tf.train.RMSPropOptimizer(learning_rate=self.config.learning_rate,
+                                                            decay=self.config.learning_rate_decay).minimize(
                     self.loss, global_step=self.global_step_tensor)
 
         tf.add_to_collection('train', self.train_step)
