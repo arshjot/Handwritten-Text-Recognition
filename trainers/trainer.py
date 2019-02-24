@@ -67,7 +67,7 @@ class Trainer(BaseTrain):
 
         self.model.save(self.sess)
 
-        print("""\tEpoch-{}: Train - loss:{:.4f} -- cer:{:.4f}""".format(epoch+1, loss, cer), end="")
+        print("""\tEpoch-{}: Train - loss:{:.4f} -- cer:{:.4f}""".format(epoch, loss, cer), end="")
 
     def train_step(self, get_err=True):
         """
