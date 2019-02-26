@@ -25,6 +25,7 @@ class Trainer(BaseTrain):
         for cur_epoch in range(self.model.cur_epoch_tensor.eval(self.sess), self.config.num_epochs, 1):
             self.train_epoch(cur_epoch)
             self.sess.run(self.model.increment_cur_epoch_tensor)
+            self.model.save(self.sess)
             self.test()
 
     def train_epoch(self, epoch=None):
@@ -64,8 +65,6 @@ class Trainer(BaseTrain):
             'train/cer_per_epoch': cer,
         }
         self.summarizer.summarize(self.model.global_step_tensor.eval(self.sess), summaries_dict)
-
-        self.model.save(self.sess)
 
         print("""\tEpoch-{}: Train - loss:{:.4f} -- cer:{:.4f}""".format(epoch, loss, cer), end="")
 
