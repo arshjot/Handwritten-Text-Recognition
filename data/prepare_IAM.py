@@ -48,7 +48,8 @@ def read_data(data_folder_path, out_height, out_name):
     # 2. Replace "|" with whitespace
     # 3. Remove separations from contractions ("We 'll" -> "We'll")
     def collapse_contraction(match_pattern, string):
-        return ''.join([j[1:] if match_pattern.match(j) else j for j in [i for i in match_pattern.split(string) if i]])
+        return ''.join([j.lstrip() if match_pattern.match(j) else j.rstrip() 
+                        for j in [i for i in match_pattern.split(string) if i]])
 
     patterns_list = [r'( \'t)', r'( \'m)', r'( \'ll)', r'( \'ve)', r'( \'s)', r'(\'re)', r'( \'d)', r'( \'T)',
                      r'( \'M)', r'( \'LL)', r'( \'VE)', r'( \'S)', r'(\'RE)', r'( \'D)']
