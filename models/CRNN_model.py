@@ -105,16 +105,16 @@ class Model(BaseModel):
             conv5_out = tf.layers.batch_normalization(conv5_out)
             conv5_out = tf.nn.leaky_relu(conv5_out)
 
-        cnn_out = tf.reduce_sum(conv5_out, axis=1)
-        output = tf.transpose(cnn_out, [1, 0, 2])
+        output = tf.transpose(conv5_out, [2, 0, 1, 3])
+        output = tf.reshape(output, [-1, self.config.batch_size,
+                                     (self.config.im_height//self.reduce_factor)*self.conv_depths[4]])
 
         # RNN
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE):
             for i in range(self.rnn_num_layers):
+                output = tf.layers.dropout(output, self.rnn_dropout, training=self.is_training)
                 lstm = tf.contrib.cudnn_rnn.CudnnLSTM(1, self.rnn_num_hidden, 'linear_input', 'bidirectional')
                 output, state = lstm(output)
-                if i < self.rnn_num_layers - 1:
-                    output = tf.layers.dropout(output, self.rnn_dropout, training=self.is_training)
 
         # Fully Connected
         with tf.name_scope('Dense'):
