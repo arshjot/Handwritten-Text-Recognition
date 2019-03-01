@@ -6,7 +6,6 @@ import pickle
 import tensorflow as tf
 from utils.augment import Augmentor
 import matplotlib.pyplot as plt
-tf.set_random_seed(42)
 
 
 class DataGenerator:

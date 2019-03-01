@@ -3,6 +3,7 @@ import sys
 sys.path.extend(['..'])
 
 import tensorflow as tf
+
 import shutil
 import os
 from data_loader.data_generator import DataGenerator
@@ -12,7 +13,6 @@ from utils.dirs import create_dirs
 from utils.logger import DefinedSummarizer
 from utils.utils import get_args
 from importlib import import_module
-tf.set_random_seed(42)
 
 
 def main():
