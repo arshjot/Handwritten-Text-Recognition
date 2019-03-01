@@ -8,8 +8,9 @@
   "im_height": 128,
 
   "batch_size": 1,
-  "num_epochs": 80,
+  "num_epochs": 160,
   "learning_rate": 0.0003,
+  "learning_rate_decay": 0.95,
 
   "max_to_keep": 2
 }
