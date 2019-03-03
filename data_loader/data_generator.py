@@ -86,23 +86,30 @@ class DataGenerator:
 def main():
     class Config:
         im_height = 128
-        batch_size = 1
+        batch_size = 5
 
     tf.reset_default_graph()
     sess = tf.Session()
 
     data_loader = DataGenerator(Config)
     x_im, y, x_w, x_len = data_loader.get_input()
+    x_im = tf.expand_dims(x_im, 3)
+    translation_vector = tf.cast(tf.stack([(tf.shape(x_im)[2] - x_w) / tf.constant(2),
+                                           tf.constant(0.0, shape=[Config.batch_size], dtype=tf.float64)], axis=1),
+                                 tf.float32)
+    x_im = tf.contrib.image.translate(x_im, translation_vector)
 
     data_loader.initialize(sess, is_train=True)
     out_x_im, out_x_w, out_x_len, out_y = sess.run([x_im, x_w, x_len, y])
+    if Config.batch_size > 1:
+        out_x_im = out_x_im[0]
 
     with open('../data/iam_h' + str(Config.im_height) + '_char_map.pkl', 'rb') as f:
         data = pickle.load(f)
     char_map = data['char_map']
     char_map_inv = {i: j for j, i in char_map.items()}
     print(''.join([char_map_inv[i] for i in out_y[0]]))
-    plt.imshow(out_x_im.reshape(128, -1), cmap='gray')
+    plt.imshow(out_x_im.reshape(Config.im_height, -1), cmap='gray')
     plt.show()
 
     print(out_x_im.shape, out_x_im.dtype)
@@ -112,9 +119,11 @@ def main():
 
     data_loader.initialize(sess, is_train=False)
     out_x_im, out_x_w, out_x_len, out_y = sess.run([x_im, x_w, x_len, y])
+    if Config.batch_size > 1:
+        out_x_im = out_x_im[0]
 
     print(''.join([char_map_inv[i] for i in out_y[0]]))
-    plt.imshow(out_x_im.reshape(128, -1), cmap='gray')
+    plt.imshow(out_x_im.reshape(Config.im_height, -1), cmap='gray')
     plt.show()
 
     print(out_x_im.shape, out_x_im.dtype)
