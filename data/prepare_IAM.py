@@ -25,6 +25,7 @@ import tensorflow as tf
 import pickle as pkl
 import re
 
+out_height = 128
 
 def read_data(data_folder_path, out_height, out_name):
     """
@@ -78,19 +79,14 @@ def read_data(data_folder_path, out_height, out_name):
         test_ids = [i for i in ids.splitlines()]
 
     def convert_image(img_id, lines_data):
-        img = cv2.imread(data_folder_path + '/processed_lines/' + img_id + '.png', 0)
+        img = cv2.imread(data_folder_path + '/lines_h' + str(out_height) + '/' + img_id + '.jpg', 0)
         lab = np.array(lines_data[img_id][1], dtype=np.int32)
 
         # Threshold images to remove background and invert colors
-        # TODO: Run below line if pre-processing = False and change path for above line
-        # img[img > line_data[im_id][0]] = 255
         img = cv2.bitwise_not(img)
         img = np.divide(img.astype(np.float32), 255.0)
-
-        # Resize - put a height cap and resize accordingly
-        out_width = int((img.shape[1] / img.shape[0]) * out_height)
-        img = cv2.resize(img, (out_width, out_height)).astype(np.float32)
-        img = cv2.imencode('.png', img)[1].tostring()
+        out_width = img.shape[1]
+        img = cv2.imencode('.jpg', img)[1].tostring()
 
         example_img = tf.train.Example(features=tf.train.Features(feature={
             'image_raw': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img])),
