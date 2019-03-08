@@ -45,13 +45,13 @@ class Model(BaseModel):
         with tf.variable_scope('inputs'):
             self.x, y, self.length, self.lab_length = self.data_loader.get_input()
             self.y = tf.contrib.layers.dense_to_sparse(y, eos_token=-1)
-            self.length = tf.div(self.length, tf.constant(self.reduce_factor, dtype=tf.int32))
             self.x = tf.expand_dims(self.x, 3)
             # Center Images
-            translation_vector = tf.cast(tf.stack([(tf.shape(self.x)[2] - self.length) / tf.constant(2),
-                                                   tf.constant(0.0, shape=[self.config.batch_size], dtype=tf.float64)],
-                                                  axis=1), tf.float32)
-            self.x = tf.contrib.image.translate(self.x, translation_vector)
+            # translation_vector = tf.cast(tf.stack([(tf.shape(self.x)[2] - self.length) / tf.constant(2),
+            #                                        tf.constant(0.0, shape=[self.config.batch_size], dtype=tf.float64)],
+            #                                       axis=1), tf.float32)
+            # self.x = tf.contrib.image.translate(self.x, translation_vector)
+            self.length = tf.div(self.length, tf.constant(self.reduce_factor, dtype=tf.int32))
             self.is_training = tf.placeholder(tf.bool, name='Training_flag')
         tf.add_to_collection('inputs', self.x)
         tf.add_to_collection('inputs', self.length)
@@ -113,7 +113,7 @@ class Model(BaseModel):
         output = tf.transpose(conv5_out, [2, 0, 1, 3])
         output = tf.reshape(output, [-1, self.config.batch_size,
                                      (self.config.im_height//self.reduce_factor)*self.conv_depths[4]])
-        self.length = tf.tile(tf.expand_dims(tf.shape(output)[0], axis=0), [self.config.batch_size])
+        # self.length = tf.tile(tf.expand_dims(tf.shape(output)[0], axis=0), [self.config.batch_size])
 
         # RNN
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE):
