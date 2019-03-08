@@ -34,7 +34,7 @@ class DataGenerator:
             .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
 
         # Batch
-        self.iterator = tf.data.Iterator.from_structure(
+        self.iterator = tf.compat.v1.data.Iterator.from_structure(
             self.train_dataset.output_types, self.train_dataset.output_shapes)
         self.training_init_op = self.iterator.make_initializer(self.train_dataset)
         self.validation_init_op = self.iterator.make_initializer(self.val_dataset)
@@ -45,12 +45,12 @@ class DataGenerator:
 
     def parser(self, record, do_augment=False):
         keys_to_features = {
-            'image_raw': tf.FixedLenFeature((), tf.string),
-            'label': tf.VarLenFeature(tf.int64),
-            'width': tf.FixedLenFeature((), tf.int64),
-            'lab_length': tf.FixedLenFeature((), tf.int64),
+            'image_raw': tf.io.FixedLenFeature((), tf.string),
+            'label': tf.io.VarLenFeature(tf.int64),
+            'width': tf.io.FixedLenFeature((), tf.int64),
+            'lab_length': tf.io.FixedLenFeature((), tf.int64),
         }
-        parsed = tf.parse_single_example(record, keys_to_features)
+        parsed = tf.io.parse_single_example(serialized=record, features=keys_to_features)
         image = tf.image.decode_png(parsed['image_raw'], 1, tf.uint8)
         label = tf.sparse.to_dense(tf.cast(parsed['label'], tf.int32))
         lab_length = tf.cast(parsed['lab_length'], tf.int32)
@@ -90,8 +90,8 @@ def main():
         im_height = 128
         batch_size = 5
 
-    tf.reset_default_graph()
-    sess = tf.Session()
+    tf.compat.v1.reset_default_graph()
+    sess = tf.compat.v1.Session()
 
     data_loader = DataGenerator(Config)
     x_im, y, x_w, x_len = data_loader.get_input()

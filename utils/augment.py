@@ -48,7 +48,7 @@ class Augmentor:
                 self.image, tf.cast(tf.math.divide(height_pad, tf.constant(2, tf.int32)), tf.int32), 0,
                 tf.math.add(self.height, height_pad), self.width)
             self.image = tf.contrib.image.rotate(self.image, rot_factor)
-            self.image = tf.image.resize_images(self.image, (self.height, self.width))
+            self.image = tf.image.resize(self.image, (self.height, self.width))
 
     def random_shearing(self, prec=4, prob=0.5):
         if np.random.random() < prob:
@@ -72,8 +72,8 @@ class Augmentor:
             kernel_size_probs /= kernel_size_probs.sum()
             kernel_sizes = np.random.choice(allowed_kernel_sizes, 2, p=kernel_size_probs)
             kernel_shape = (kernel_sizes[0], kernel_sizes[1], 1)
-            kernel = tf.convert_to_tensor(np.fromfunction(self.bernoulli_np_value, kernel_shape, dtype=np.float32,
-                                                          array_shape=kernel_shape, r=rrate), dtype=tf.float32)
+            kernel = tf.convert_to_tensor(value=np.fromfunction(self.bernoulli_np_value, kernel_shape, dtype=np.float32,
+                                                                array_shape=kernel_shape, r=rrate), dtype=tf.float32)
             self.image = tf.expand_dims(self.image, 0)
             self.image = tf.math.add(tf.nn.erosion2d(self.image, kernel, [1, 1, 1, 1], [1, 1, 1, 1], 'SAME'),
                                      tf.constant(1.0))
@@ -86,8 +86,8 @@ class Augmentor:
             kernel_size_probs /= kernel_size_probs.sum()
             kernel_sizes = np.random.choice(allowed_kernel_sizes, 2, p=kernel_size_probs)
             kernel_shape = (kernel_sizes[0], kernel_sizes[1], 1)
-            kernel = tf.convert_to_tensor(np.fromfunction(self.bernoulli_np_value, kernel_shape, dtype=np.float32,
-                                                          array_shape=kernel_shape, r=rrate), dtype=tf.float32)
+            kernel = tf.convert_to_tensor(value=np.fromfunction(self.bernoulli_np_value, kernel_shape, dtype=np.float32,
+                                                                array_shape=kernel_shape, r=rrate), dtype=tf.float32)
             self.image = tf.expand_dims(self.image, 0)
             self.image = tf.math.add(tf.nn.dilation2d(self.image, kernel, [1, 1, 1, 1], [1, 1, 1, 1], 'SAME'),
                                      tf.constant(-1.0))

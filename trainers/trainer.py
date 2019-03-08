@@ -13,8 +13,8 @@ class Trainer(BaseTrain):
         # Summarizer
         self.summarizer = logger
 
-        self.x, self.length, self.lab_length,  self.y, self.is_training = tf.get_collection('inputs')
-        self.train_op, self.loss_node, self.acc_node = tf.get_collection('train')
+        self.x, self.length, self.lab_length,  self.y, self.is_training = tf.compat.v1.get_collection('inputs')
+        self.train_op, self.loss_node, self.acc_node = tf.compat.v1.get_collection('train')
         self.pred = self.model.prediction
 
     def train(self):

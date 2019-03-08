@@ -38,7 +38,7 @@ def main():
     create_dirs([config.summary_dir, config.checkpoint_dir])
 
     # create tensorflow session
-    sess = tf.Session()
+    sess = tf.compat.v1.Session()
 
     # create your data generator
     data_loader = DataGenerator(config)

@@ -21,7 +21,7 @@ class DefinedSummarizer:
 
         self.init_summary_ops()
 
-        self.summary_writer = tf.summary.FileWriter(summary_dir, self.sess.graph)
+        self.summary_writer = tf.compat.v1.summary.FileWriter(summary_dir, self.sess.graph)
 
     def set_summaries(self, scalar_tags=None, images_tags=None):
         self.scalar_tags = scalar_tags
@@ -29,17 +29,18 @@ class DefinedSummarizer:
         self.init_summary_ops()
 
     def init_summary_ops(self):
-        with tf.variable_scope('summary_ops'):
+        with tf.compat.v1.variable_scope('summary_ops'):
             if self.scalar_tags is not None:
                 for tag in self.scalar_tags:
                     self.summary_tags += [tag]
-                    self.summary_placeholders[tag] = tf.placeholder('float32', None, name=tag)
-                    self.summary_ops[tag] = tf.summary.scalar(tag, self.summary_placeholders[tag])
+                    self.summary_placeholders[tag] = tf.compat.v1.placeholder('float32', None, name=tag)
+                    self.summary_ops[tag] = tf.compat.v1.summary.scalar(tag, self.summary_placeholders[tag])
             if self.images_tags is not None:
                 for tag, shape in self.images_tags:
                     self.summary_tags += [tag]
-                    self.summary_placeholders[tag] = tf.placeholder('float32', shape, name=tag)
-                    self.summary_ops[tag] = tf.summary.image(tag, self.summary_placeholders[tag], max_outputs=10)
+                    self.summary_placeholders[tag] = tf.compat.v1.placeholder('float32', shape, name=tag)
+                    self.summary_ops[tag] = tf.compat.v1.summary.image(tag, self.summary_placeholders[tag],
+                                                                       max_outputs=10)
 
     def summarize(self, step, summaries_dict=None, summaries_merged=None):
         """
@@ -68,9 +69,9 @@ class Logger:
         self.config = config
         self.summary_placeholders = {}
         self.summary_ops = {}
-        self.train_summary_writer = tf.summary.FileWriter(os.path.join(self.config.summary_dir, "train"),
+        self.train_summary_writer = tf.compat.v1.summary.FileWriter(os.path.join(self.config.summary_dir, "train"),
                                                           self.sess.graph)
-        self.test_summary_writer = tf.summary.FileWriter(os.path.join(self.config.summary_dir, "test"))
+        self.test_summary_writer = tf.compat.v1.summary.FileWriter(os.path.join(self.config.summary_dir, "test"))
 
     # it can summarize scalars and images.
     def summarize(self, step, summarizer="train", scope="", summaries_dict=None):
@@ -82,21 +83,22 @@ class Logger:
         :return:
         """
         summary_writer = self.train_summary_writer if summarizer == "train" else self.test_summary_writer
-        with tf.variable_scope(scope):
+        with tf.compat.v1.variable_scope(scope):
 
             if summaries_dict is not None:
                 summary_list = []
                 for tag, value in summaries_dict.items():
                     if tag not in self.summary_ops:
                         if len(value.shape) <= 1:
-                            self.summary_placeholders[tag] = tf.placeholder('float32', value.shape, name=tag)
+                            self.summary_placeholders[tag] = tf.compat.v1.placeholder('float32', value.shape, name=tag)
                         else:
-                            self.summary_placeholders[tag] = tf.placeholder('float32', [None] + list(value.shape[1:]),
-                                                                            name=tag)
+                            self.summary_placeholders[tag] = tf.compat.v1.placeholder('float32',
+                                                                                      [None] + list(value.shape[1:]),
+                                                                                      name=tag)
                         if len(value.shape) <= 1:
-                            self.summary_ops[tag] = tf.summary.scalar(tag, self.summary_placeholders[tag])
+                            self.summary_ops[tag] = tf.compat.v1.summary.scalar(tag, self.summary_placeholders[tag])
                         else:
-                            self.summary_ops[tag] = tf.summary.image(tag, self.summary_placeholders[tag])
+                            self.summary_ops[tag] = tf.compat.v1.summary.image(tag, self.summary_placeholders[tag])
 
                     summary_list.append(self.sess.run(self.summary_ops[tag], {self.summary_placeholders[tag]: value}))
 

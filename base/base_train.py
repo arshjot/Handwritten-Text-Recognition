@@ -20,7 +20,7 @@ class BaseTrain:
             self.data_loader = data_loader
 
         # Initialize all variables of the graph
-        self.init = tf.global_variables_initializer()
+        self.init = tf.compat.v1.global_variables_initializer()
         self.sess.run(self.init)
 
     def train(self):

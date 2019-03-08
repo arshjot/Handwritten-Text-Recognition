@@ -98,17 +98,17 @@ def read_data(data_folder_path, out_height, out_name):
         return example_img
 
     print('Training Data')
-    with tf.python_io.TFRecordWriter(out_name+'_train.tfrecords') as writer:
+    with tf.io.TFRecordWriter(out_name+'_train.tfrecords') as writer:
         for im_id in tqdm(train_ids):
             example = convert_image(im_id, line_data)
             writer.write(example.SerializeToString())
     print('Validation Data')
-    with tf.python_io.TFRecordWriter(out_name+'_val.tfrecords') as writer:
+    with tf.io.TFRecordWriter(out_name+'_val.tfrecords') as writer:
         for im_id in tqdm(val_ids):
             example = convert_image(im_id, line_data)
             writer.write(example.SerializeToString())
     print('Test Data')
-    with tf.python_io.TFRecordWriter(out_name+'_test.tfrecords') as writer:
+    with tf.io.TFRecordWriter(out_name+'_test.tfrecords') as writer:
         for im_id in tqdm(test_ids):
             example = convert_image(im_id, line_data)
             writer.write(example.SerializeToString())
