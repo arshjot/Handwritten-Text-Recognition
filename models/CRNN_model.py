@@ -1,5 +1,6 @@
 from base.base_model import BaseModel
 import tensorflow as tf
+import warpctc_tensorflow
 
 
 class Model(BaseModel):
@@ -117,7 +118,6 @@ class Model(BaseModel):
 
         # Fully Connected
         with tf.compat.v1.name_scope('Dense'):
-            output = tf.concat(output, 2)
             # Linear dropout
             output = tf.compat.v1.layers.dropout(output, self.linear_dropout, training=self.is_training)
             # Reshaping to apply the same weights over the timesteps
@@ -130,7 +130,8 @@ class Model(BaseModel):
         self.logits = tf.transpose(a=self.logits, perm=(1, 0, 2))
 
         with tf.compat.v1.variable_scope('loss-acc'):
-            self.loss = tf.nn.ctc_loss(self.y, self.logits, self.length)
+            self.loss = warpctc_tensorflow.ctc(self.logits, self.y.values, self.lab_length, self.length,
+                                               self.data_loader.num_classes - 1)
             self.cost = tf.reduce_mean(input_tensor=self.loss)
             self.prediction = tf.compat.v1.nn.ctc_beam_search_decoder(inputs=self.logits, sequence_length=self.length,
                                                                       merge_repeated=True)
@@ -140,8 +141,8 @@ class Model(BaseModel):
             update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
             with tf.control_dependencies(update_ops):
                 self.train_step = tf.compat.v1.train.RMSPropOptimizer(learning_rate=self.config.learning_rate,
-                                                                      decay=self.config.learning_rate_decay).minimize(
-                    self.loss, global_step=self.global_step_tensor)
+                                                                      decay=self.config.learning_rate_decay)\
+                    .minimize(self.loss, global_step=self.global_step_tensor)
 
         tf.compat.v1.add_to_collection('train', self.train_step)
         tf.compat.v1.add_to_collection('train', self.cost)
