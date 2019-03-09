@@ -46,7 +46,7 @@ class Model(BaseModel):
             self.x, y, self.length, self.lab_length = self.data_loader.get_input()
             self.y = tf.contrib.layers.dense_to_sparse(y, eos_token=-1)
             self.x = tf.expand_dims(self.x, 3)
-            self.length = tf.compat.v1.div(self.length, tf.constant(self.reduce_factor, dtype=tf.int32))
+            self.length = tf.cast(tf.math.ceil(tf.math.divide(self.length, tf.constant(self.reduce_factor))), tf.int32)
             self.is_training = tf.compat.v1.placeholder(tf.bool, name='Training_flag')
         tf.compat.v1.add_to_collection('inputs', self.x)
         tf.compat.v1.add_to_collection('inputs', self.length)
