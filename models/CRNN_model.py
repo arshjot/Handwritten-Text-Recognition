@@ -8,11 +8,11 @@ class Model(BaseModel):
         super(Model, self).__init__(config)
         self.rnn_num_hidden = 256
         self.rnn_num_layers = 5
-        self.rnn_dropout = 0.5
+        self.rnn_dropout = 0.0
         self.conv_patch_sizes = [3] * 5
         self.conv_depths = [16, 32, 48, 64, 80]
-        self.conv_dropouts = [0, 0, 0.2, 0.2, 0.2]
-        self.linear_dropout = 0.5
+        self.conv_dropouts = [0, 0, 0.0, 0.0, 0.0]
+        self.linear_dropout = 0.0
         self.reduce_factor = 8
 
         # Get the data_loader to make the joint of the inputs in the graph
@@ -47,11 +47,12 @@ class Model(BaseModel):
             self.y = tf.contrib.layers.dense_to_sparse(y, eos_token=-1)
             self.x = tf.expand_dims(self.x, 3)
             # Center Images
-            # translation_vector = tf.cast(tf.stack([(tf.shape(self.x)[2] - self.length) / tf.constant(2),
-            #                                        tf.constant(0.0, shape=[self.config.batch_size], dtype=tf.float64)],
-            #                                       axis=1), tf.float32)
-            # self.x = tf.contrib.image.translate(self.x, translation_vector)
-            self.length = tf.div(self.length, tf.constant(self.reduce_factor, dtype=tf.int32))
+            x_shift = (tf.shape(self.x)[2] - self.length) / tf.constant(2)
+            y_shift = tf.zeros_like(x_shift)
+            translation_vector = tf.cast(tf.stack([x_shift, y_shift], axis=1), tf.float32)
+            self.x = tf.contrib.image.translate(self.x, translation_vector)
+            self.length = tf.cast(tf.math.ceil(tf.math.divide(self.length, tf.constant(self.reduce_factor))), tf.int32)
+            batch_size = tf.shape(self.x)[0]
             self.is_training = tf.placeholder(tf.bool, name='Training_flag')
         tf.add_to_collection('inputs', self.x)
         tf.add_to_collection('inputs', self.length)
@@ -68,8 +69,8 @@ class Model(BaseModel):
 
         # CNNs
         with tf.name_scope('CNN_Block_1'):
-            conv1_out = tf.layers.dropout(self.x, self.conv_dropouts[0], noise_shape=tf.constant(
-                value=[self.config.batch_size, 1, 1, 1]), training=self.is_training)
+            conv1_out = tf.layers.dropout(self.x, self.conv_dropouts[0], tf.concat(
+                [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, 1])], 0), training=self.is_training)
             conv1_out = tf.layers.conv2d(conv1_out, self.conv_depths[0], self.conv_patch_sizes[0], padding='same',
                                          activation=None, kernel_initializer=intitalizer)
             conv1_out = tf.layers.batch_normalization(conv1_out)
@@ -77,8 +78,8 @@ class Model(BaseModel):
             conv1_out = tf.layers.max_pooling2d(conv1_out, 2, 2, padding='same')
 
         with tf.name_scope('CNN_Block_2'):
-            conv2_out = tf.layers.dropout(conv1_out, self.conv_dropouts[1], noise_shape=tf.constant(
-                value=[self.config.batch_size, 1, 1, self.conv_depths[0]]), training=self.is_training)
+            conv2_out = tf.layers.dropout(conv1_out, self.conv_dropouts[1], noise_shape=tf.concat(
+                [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, self.conv_depths[0]])], 0), training=self.is_training)
             conv2_out = tf.layers.conv2d(conv2_out, self.conv_depths[1], self.conv_patch_sizes[1], padding='same',
                                          activation=None, kernel_initializer=intitalizer)
             conv2_out = tf.layers.batch_normalization(conv2_out)
@@ -86,8 +87,8 @@ class Model(BaseModel):
             conv2_out = tf.layers.max_pooling2d(conv2_out, 2, 2, padding='same')
 
         with tf.name_scope('CNN_Block_3'):
-            conv3_out = tf.layers.dropout(conv2_out, self.conv_dropouts[2], noise_shape=tf.constant(
-                value=[self.config.batch_size, 1, 1, self.conv_depths[1]]), training=self.is_training)
+            conv3_out = tf.layers.dropout(conv2_out, self.conv_dropouts[2], noise_shape=tf.concat(
+                [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, self.conv_depths[1]])], 0), training=self.is_training)
             conv3_out = tf.layers.conv2d(conv3_out, self.conv_depths[2], self.conv_patch_sizes[2], padding='same',
                                          activation=None, kernel_initializer=intitalizer)
             conv3_out = tf.layers.batch_normalization(conv3_out)
@@ -95,25 +96,24 @@ class Model(BaseModel):
             conv3_out = tf.layers.max_pooling2d(conv3_out, 2, 2, padding='same')
 
         with tf.name_scope('CNN_Block_4'):
-            conv4_out = tf.layers.dropout(conv3_out, self.conv_dropouts[3], noise_shape=tf.constant(
-                value=[self.config.batch_size, 1, 1, self.conv_depths[2]]), training=self.is_training)
+            conv4_out = tf.layers.dropout(conv3_out, self.conv_dropouts[3], noise_shape=tf.concat(
+                [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, self.conv_depths[2]])], 0), training=self.is_training)
             conv4_out = tf.layers.conv2d(conv4_out, self.conv_depths[3], self.conv_patch_sizes[3], padding='same',
                                          activation=None, kernel_initializer=intitalizer)
             conv4_out = tf.layers.batch_normalization(conv4_out)
             conv4_out = tf.nn.leaky_relu(conv4_out)
 
         with tf.name_scope('CNN_Block_5'):
-            conv5_out = tf.layers.dropout(conv4_out, self.conv_dropouts[4], noise_shape=tf.constant(
-                value=[self.config.batch_size, 1, 1, self.conv_depths[3]]), training=self.is_training)
+            conv5_out = tf.layers.dropout(conv4_out, self.conv_dropouts[4], noise_shape=tf.concat(
+                [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, self.conv_depths[3]])], 0), training=self.is_training)
             conv5_out = tf.layers.conv2d(conv5_out, self.conv_depths[4], self.conv_patch_sizes[4], padding='same',
                                          activation=None, kernel_initializer=intitalizer)
             conv5_out = tf.layers.batch_normalization(conv5_out)
             conv5_out = tf.nn.leaky_relu(conv5_out)
 
         output = tf.transpose(conv5_out, [2, 0, 1, 3])
-        output = tf.reshape(output, [-1, self.config.batch_size,
-                                     (self.config.im_height//self.reduce_factor)*self.conv_depths[4]])
-        # self.length = tf.tile(tf.expand_dims(tf.shape(output)[0], axis=0), [self.config.batch_size])
+        output = tf.reshape(output, [-1, batch_size, (self.config.im_height//self.reduce_factor)*self.conv_depths[4]])
+        self.length = tf.tile(tf.expand_dims(tf.shape(output)[0], axis=0), [batch_size])
 
         # RNN
         with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE):
@@ -133,7 +133,7 @@ class Model(BaseModel):
             logits = tf.matmul(output, out_W) + out_b
 
         # Reshaping back to the original shape
-        self.logits = tf.reshape(logits, [self.config.batch_size, -1, self.data_loader.num_classes])
+        self.logits = tf.reshape(logits, [batch_size, -1, self.data_loader.num_classes])
         self.logits = tf.transpose(self.logits, (1, 0, 2))
 
         with tf.variable_scope('loss-acc'):

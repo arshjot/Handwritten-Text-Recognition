@@ -52,6 +52,7 @@ class Trainer(BaseTrain):
                 progbar.update(_, values=[('loss', loss), ('cer', np.mean(cer))])
             else:
                 loss = self.train_step(get_err=False)
+                losses.append(loss)
                 progbar.update(_, values=[('loss', loss)])
 
         loss = np.mean(losses)
