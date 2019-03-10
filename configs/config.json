@@ -1,5 +1,5 @@
 {
-  "exp_name": "CRNN_h128",
+  "exp_name": "CRNN_h128_bs4",
   "train_from_start": 1,
   "random_prediction": 1,
 
@@ -7,7 +7,7 @@
 
   "im_height": 128,
 
-  "batch_size": 1,
+  "batch_size": 4,
   "num_epochs": 160,
   "learning_rate": 0.0003,
   "learning_rate_decay": 0.95,
