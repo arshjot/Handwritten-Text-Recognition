@@ -8,11 +8,11 @@ class Model(BaseModel):
         super(Model, self).__init__(config)
         self.rnn_num_hidden = 256
         self.rnn_num_layers = 5
-        self.rnn_dropout = 0.0
+        self.rnn_dropout = 0.5
         self.conv_patch_sizes = [3] * 5
         self.conv_depths = [16, 32, 48, 64, 80]
-        self.conv_dropouts = [0, 0, 0.0, 0.0, 0.0]
-        self.linear_dropout = 0.0
+        self.conv_dropouts = [0, 0, 0.2, 0.2, 0.2]
+        self.linear_dropout = 0.5
         self.reduce_factor = 8
 
         # Get the data_loader to make the joint of the inputs in the graph
@@ -133,8 +133,7 @@ class Model(BaseModel):
             logits = tf.matmul(output, out_W) + out_b
 
         # Reshaping back to the original shape
-        self.logits = tf.reshape(logits, [batch_size, -1, self.data_loader.num_classes])
-        self.logits = tf.transpose(self.logits, (1, 0, 2))
+        self.logits = tf.reshape(logits, [-1, batch_size, self.data_loader.num_classes])
 
         with tf.variable_scope('loss-acc'):
             self.loss = warpctc_tensorflow.ctc(self.logits, self.y.values, self.lab_length, self.length,
