@@ -111,7 +111,7 @@ class Model(BaseModel):
             conv5_out = tf.nn.leaky_relu(conv5_out)
 
         output = tf.transpose(a=conv5_out, perm=[2, 0, 1, 3])
-        output = tf.reshape(output, [-1, batch_size, (self.config.im_height // self.reduce_factor) * self.conv_depths[4]])
+        output = tf.reshape(output, [-1, batch_size, (self.config.im_height // self.reduce_factor)*self.conv_depths[4]])
 
         # RNN
         with tf.compat.v1.variable_scope('MultiRNN', reuse=tf.compat.v1.AUTO_REUSE):
@@ -130,8 +130,7 @@ class Model(BaseModel):
             logits = tf.matmul(output, out_W) + out_b
 
         # Reshaping back to the original shape
-        self.logits = tf.reshape(logits, [batch_size, -1, self.data_loader.num_classes])
-        self.logits = tf.transpose(a=self.logits, perm=(1, 0, 2))
+        self.logits = tf.reshape(logits, [-1, batch_size, self.data_loader.num_classes])
 
         with tf.compat.v1.variable_scope('loss-acc'):
             self.loss = warpctc_tensorflow.ctc(self.logits, self.y.values, self.lab_length, self.length,
