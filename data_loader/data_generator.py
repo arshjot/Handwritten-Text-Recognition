@@ -24,10 +24,21 @@ class DataGenerator:
         padded_shapes = ((tf.TensorShape([self.config.im_height, None])),
                          (tf.TensorShape([None])), (tf.TensorShape([])), (tf.TensorShape([])))
         padding_values = ((tf.constant(0.0)), (tf.constant(-1)), (tf.constant(0)), (tf.constant(0)))
-        self.train_dataset = self.train_dataset.map(lambda x: self.parser(x, False),
-                                                    num_parallel_calls=self.config.batch_size) \
-            .shuffle(buffer_size=500) \
-            .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
+        if self.config.bucketing:
+            self.train_dataset = self.train_dataset.map(lambda x: self.parser(x, True),
+                                                        num_parallel_calls=self.config.batch_size) \
+                .apply(tf.data.experimental.bucket_by_sequence_length(
+                    element_length_func=self.element_length_fn,
+                    bucket_boundaries=range(500, 4501, 200),
+                    bucket_batch_sizes=[self.config.batch_size] * (len(range(500, 4501, 200)) + 1),
+                    padded_shapes=padded_shapes,
+                    padding_values=padding_values)) \
+                .shuffle(buffer_size=200)
+        else:
+            self.train_dataset = self.train_dataset.map(lambda x: self.parser(x, False),
+                                                        num_parallel_calls=self.config.batch_size) \
+                .shuffle(buffer_size=200) \
+                .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
         self.val_dataset = self.val_dataset.map(self.parser, num_parallel_calls=self.config.batch_size) \
             .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
         self.test_dataset = self.test_dataset.map(self.parser, num_parallel_calls=self.config.batch_size) \

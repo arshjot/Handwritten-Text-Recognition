@@ -1,11 +1,12 @@
 {
-  "exp_name": "CRNN_h128_bs4",
+  "exp_name": "CRNN_h128_bs4_tf2",
   "train_from_start": 1,
   "random_prediction": 1,
 
   "architecture": "CRNN",
 
   "im_height": 128,
+  "bucketing": 0,
 
   "batch_size": 4,
   "num_epochs": 160,
