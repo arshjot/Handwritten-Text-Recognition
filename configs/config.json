@@ -6,6 +6,7 @@
   "architecture": "CRNN",
 
   "im_height": 128,
+  "bucketing": 0,
 
   "batch_size": 4,
   "num_epochs": 160,
