@@ -10,12 +10,15 @@ class BaseModel:
         self.init_cur_epoch()
 
     # save function that saves the checkpoint in the path defined in the config file
-    def save(self, sess):
-        self.saver.save(sess, self.config.checkpoint_dir, self.global_step_tensor)
+    def save(self, sess, best=False):
+        if best:
+            self.best_saver.save(sess, self.config.best_model_dir, self.global_step_tensor)
+        else:
+            self.saver.save(sess, self.config.checkpoint_dir, self.global_step_tensor)
 
     # load latest checkpoint from the experiment path defined in the config file
-    def load(self, sess):
-        latest_checkpoint = tf.train.latest_checkpoint(self.config.checkpoint_dir)
+    def load(self, sess, load_dir):
+        latest_checkpoint = tf.train.latest_checkpoint(load_dir)
         if latest_checkpoint:
             print("Loading model checkpoint {} ...\n".format(latest_checkpoint))
             self.saver.restore(sess, latest_checkpoint)

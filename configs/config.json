@@ -1,5 +1,5 @@
 {
-  "exp_name": "CRNN_h128_bs4",
+  "exp_name": "CRNN_h128",
   "train_from_start": 1,
   "random_prediction": 1,
 
@@ -13,5 +13,7 @@
   "learning_rate": 0.0003,
   "learning_rate_decay": 0.95,
 
-  "max_to_keep": 2
+  "max_to_keep_cpt": 1,
+  "max_to_keep_best": 1,
+  "load_best": 0
 }

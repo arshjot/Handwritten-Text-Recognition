@@ -8,7 +8,10 @@ class Trainer(BaseTrain):
         super(Trainer, self).__init__(sess, model, config, logger, data_loader)
 
         # load the model from the latest checkpoint
-        self.model.load(self.sess)
+        if self.config.load_best:
+            self.model.load(self.sess, self.config.best_model_dir)
+        else:
+            self.model.load(self.sess, self.config.checkpoint_dir)
 
         # Summarizer
         self.summarizer = logger
@@ -22,11 +25,17 @@ class Trainer(BaseTrain):
         This is the main loop of training
         Looping on the epochs
         """
+        best_val = 10
         for cur_epoch in range(self.model.cur_epoch_tensor.eval(self.sess), self.config.num_epochs, 1):
             self.train_epoch(cur_epoch)
             self.sess.run(self.model.increment_cur_epoch_tensor)
             self.model.save(self.sess)
-            self.test()
+            curr_val_loss, curr_val_cer = self.test()
+            if cur_epoch == 1:
+                best_val = curr_val_cer
+            if curr_val_cer < best_val:
+                self.model.save(self.sess, True)
+                best_val = curr_val_cer
 
     def train_epoch(self, epoch=None):
         """
@@ -122,3 +131,5 @@ class Trainer(BaseTrain):
             end_idx = np.where(label[0] == -1)[0][0] if len(np.where(label[0] == -1)[0]) != 0 else len(label[0])
             label = ''.join([self.data_loader.char_map_inv[i] for i in label[0][:end_idx]])
             print("Label: {}\nPrediction: {}".format(label, pred))
+
+        return loss, cer

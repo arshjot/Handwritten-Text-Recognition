@@ -155,4 +155,5 @@ class Model(BaseModel):
         tf.add_to_collection('train', self.cer)
 
     def init_saver(self):
-        self.saver = tf.train.Saver(max_to_keep=self.config.max_to_keep, save_relative_paths=True)
+        self.saver = tf.train.Saver(max_to_keep=self.config.max_to_keep_cpt, save_relative_paths=True)
+        self.best_saver = tf.train.Saver(max_to_keep=self.config.max_to_keep_best, save_relative_paths=True)

@@ -35,7 +35,9 @@ def main():
             shutil.rmtree(config.summary_dir)
         if os.path.exists(config.checkpoint_dir):
             shutil.rmtree(config.checkpoint_dir)
-    create_dirs([config.summary_dir, config.checkpoint_dir])
+        if os.path.exists(config.best_model_dir):
+            shutil.rmtree(config.best_model_dir)
+    create_dirs([config.summary_dir, config.checkpoint_dir, config.best_model_dir])
 
     # create tensorflow session
     sess = tf.Session()
