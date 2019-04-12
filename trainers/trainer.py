@@ -1,124 +1,77 @@
 from base.base_train import BaseTrain
-import numpy as np
+import os
 import tensorflow as tf
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping, ReduceLROnPlateau
+from utils.utils import RandomPrediction
 
 
 class Trainer(BaseTrain):
-    def __init__(self, sess, model, config, logger, data_loader):
-        super(Trainer, self).__init__(sess, model, config, logger, data_loader)
+    def __init__(self, model, data_loader, config):
+        super(Trainer, self).__init__(model, data_loader, config)
+        self.callbacks = []
+        self.loss = []
+        self.acc = []
+        self.val_loss = []
+        self.val_acc = []
 
-        # load the model from the latest checkpoint
-        self.model.load(self.sess)
+        self.data_loader = data_loader
 
-        # Summarizer
-        self.summarizer = logger
-
-        self.x, self.length, self.lab_length,  self.y, self.is_training = tf.compat.v1.get_collection('inputs')
-        self.train_op, self.loss_node, self.acc_node = tf.compat.v1.get_collection('train')
+        self.init_callbacks()
         self.pred = self.model.prediction
 
+    def init_callbacks(self):
+        self.callbacks.append(
+            ModelCheckpoint(
+                filepath=os.path.join(self.config.checkpoint_dir,
+                                      '%s-{epoch:02d}-{val_cer:.2f}.hdf5' % self.config.exp_name),
+                monitor='val_cer',
+                save_best_only=True,
+                save_weights_only=True,
+            )
+        )
+
+        self.callbacks.append(
+            TensorBoard(
+                log_dir=self.config.summary_dir,
+            )
+        )
+
+        self.callbacks.append(
+            EarlyStopping(
+                monitor='val_acc',
+                patience=80,
+                verbose=1,
+                min_delta=1e-4,
+            )
+        )
+
+        self.callbacks.append(
+            ReduceLROnPlateau(
+                monitor='val_acc',
+                factor=0.3,
+                patience=20,
+                verbose=1,
+                min_delta=1e-4,
+            )
+        )
+
+        # Show random prediction at end of epoch
+        self.callbacks.append(
+            RandomPrediction(
+                data_loader=self.data_loader,
+                model=self.model,
+            )
+        )
+
+    @tf.function
     def train(self):
-        """
-        This is the main loop of training
-        Looping on the epochs
-        """
-        for cur_epoch in range(self.model.cur_epoch_tensor.eval(self.sess), self.config.num_epochs, 1):
-            self.train_epoch(cur_epoch)
-            self.sess.run(self.model.increment_cur_epoch_tensor)
-            self.model.save(self.sess)
-            self.test()
-
-    def train_epoch(self, epoch=None):
-        """
-        Train one epoch
-        :param epoch: cur epoch number
-        """
-        # initialize dataset
-        self.data_loader.initialize(self.sess, is_train=True)
-
-        # Progress bar
-        tt = range(self.data_loader.num_iterations_train)
-        progbar = tf.keras.utils.Progbar(self.data_loader.num_iterations_train)
-
-        # Iterate over batches
-        losses, cers = [], []
-
-        for _ in tt:
-            # Beam search prediction at every 10th step only - to improve training speed
-            if _ % 10 == 0:
-                loss, cer = self.train_step()
-                cers += list(cer)
-                losses.append(loss)
-                progbar.update(_, values=[('loss', loss), ('cer', np.mean(cer))])
-            else:
-                loss = self.train_step(get_err=False)
-                losses.append(loss)
-                progbar.update(_, values=[('loss', loss)])
-
-        loss = np.mean(losses)
-        cer = np.mean(cers)
-
-        self.sess.run(self.model.global_epoch_inc)
-
-        # summarize
-        summaries_dict = {
-            'train/loss_per_epoch': loss,
-            'train/cer_per_epoch': cer,
-        }
-        self.summarizer.summarize(self.model.global_step_tensor.eval(self.sess), summaries_dict)
-
-        print("""\tEpoch-{}: Train - loss:{:.4f} -- cer:{:.4f}""".format(epoch, loss, cer), end="")
-
-    def train_step(self, get_err=True):
-        """
-        Run the session of train_step in tensorflow, also get the loss & acc of that minibatch.
-        :return: (loss, ler) tuple of some metrics to be used in summaries
-        """
-        if get_err:
-            _, loss, cer = self.sess.run([self.train_op, self.loss_node, self.acc_node],
-                                         feed_dict={self.is_training: True})
-            return loss, cer
-        else:
-            _, loss = self.sess.run([self.train_op, self.loss_node],
-                                    feed_dict={self.is_training: True})
-            return loss
-
-    def test(self):
-        # initialize dataset
-        self.data_loader.initialize(self.sess, is_train=False)
-
-        # Progress bar
-        tt = range(self.data_loader.num_iterations_val)
-        sample_num = np.random.choice(tt)
-
-        losses, cers = [], []
-        # Iterate over batches
-        for _ in tt:
-            if self.config.random_prediction & (_ == sample_num):
-                loss, cer, predictions, label = self.sess.run([self.loss_node, self.acc_node, self.pred, self.y],
-                                                              feed_dict={self.is_training: False})
-            else:
-                loss, cer = self.sess.run([self.loss_node, self.acc_node],
-                                          feed_dict={self.is_training: False})
-            losses.append(loss)
-            cers += list(cer)
-        loss = np.mean(losses)
-        cer = np.mean(cers)
-
-        # summarize
-        summaries_dict = {
-            'test/loss_per_epoch': loss,
-            'test/cer_per_epoch': cer,
-        }
-        self.summarizer.summarize(self.model.global_step_tensor.eval(self.sess), summaries_dict)
-
-        print("""\tVal - loss:{:.4f} -- cer:{:.4f}""".format(loss, cer))
-
-        if self.config.random_prediction:  # Print random prediction and corresponding label
-            pred = np.zeros(predictions[0][0].dense_shape)
-            for idx, val in enumerate(predictions[0][0].indices):
-                pred[val[0]][val[1]] = predictions[0][0].values[idx]
-            pred = ''.join([self.data_loader.char_map_inv[i] for i in pred[0]])
-            end_idx = np.where(label[0] == -1)[0][0] if len(np.where(label[0] == -1)[0]) != 0 else len(label[0])
-            label = ''.join([self.data_loader.char_map_inv[i] for i in label[0][:end_idx]])
-            print("Label: {}\nPrediction: {}".format(label, pred))
+        history = self.model.model.fit(
+            self.data_loader.train_dataset,
+            epochs=self.config.num_epochs,
+            validation_data=self.data_loader.val_dataset,
+            callbacks=self.callbacks,
+        )
+        self.loss.extend(history.history['loss'])
+        self.acc.extend(history.history['acc'])
+        self.val_loss.extend(history.history['val_loss'])
+        self.val_acc.extend(history.history['val_acc'])

@@ -6,10 +6,9 @@
   "architecture": "CRNN",
 
   "im_height": 128,
-  "bucketing": 0,
 
   "batch_size": 4,
-  "num_epochs": 160,
+  "num_epochs": 1000,
   "learning_rate": 0.0003,
   "learning_rate_decay": 0.95,
 

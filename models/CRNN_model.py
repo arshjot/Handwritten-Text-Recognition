@@ -1,5 +1,7 @@
 from base.base_model import BaseModel
 import tensorflow as tf
+from tensorflow.keras.layers import Dropout, Conv2D, LeakyReLU, BatchNormalization, MaxPool2D, Dense, LSTM, \
+    Bidirectional, Masking, Lambda, Multiply, Reshape
 import warpctc_tensorflow
 
 
@@ -28,128 +30,98 @@ class Model(BaseModel):
         self.train_step = None
 
         self.build_model()
-        self.init_saver()
 
     @staticmethod
     def calc_cer(predicted, targets):
         return tf.edit_distance(tf.cast(predicted, tf.int32), targets, normalize=True)
 
-    def build_model(self):
-        # Helper Variables
-        self.global_step_tensor = tf.Variable(0, trainable=False, name='global_step')
-        self.global_step_inc = self.global_step_tensor.assign(self.global_step_tensor + 1)
-        self.global_epoch_tensor = tf.Variable(0, trainable=False, name='global_epoch')
-        self.global_epoch_inc = self.global_epoch_tensor.assign(self.global_epoch_tensor + 1)
-
+    def build_model(self, eval_mode=False):
         # Inputs to the network
-        with tf.compat.v1.variable_scope('inputs'):
-            self.x, y, self.length, self.lab_length = self.data_loader.get_input()
-            self.y = tf.contrib.layers.dense_to_sparse(y, eos_token=-1)
-            self.x = tf.expand_dims(self.x, 3)
-            self.length = tf.cast(tf.math.ceil(tf.math.divide(self.length, tf.constant(self.reduce_factor))), tf.int32)
-            self.is_training = tf.compat.v1.placeholder(tf.bool, name='Training_flag')
-            batch_size = tf.shape(self.x)[0]
-        tf.compat.v1.add_to_collection('inputs', self.x)
-        tf.compat.v1.add_to_collection('inputs', self.length)
-        tf.compat.v1.add_to_collection('inputs', self.lab_length)
-        tf.compat.v1.add_to_collection('inputs', y)
-        tf.compat.v1.add_to_collection('inputs', self.is_training)
+        self.x = tf.keras.Input(shape=(self.config.im_height, None,))
+        self.length = tf.keras.Input(shape=(), dtype=tf.int32)
+        self.lab_length = tf.keras.Input(shape=(1,), dtype=tf.int32)
+        self.y = tf.keras.Input(shape=(None,), sparse=True, dtype=tf.int32)
 
-        # Define CNN variables
-        intitalizer = tf.contrib.layers.xavier_initializer_conv2d()
+        self.x_in = Reshape((self.config.im_height, -1, 1))(self.x)
+        self.length_in = self.length
+        batch_size = tf.shape(self.x_in)[0]
 
-        out_W = tf.Variable(tf.random.truncated_normal([2 * self.rnn_num_hidden, self.data_loader.num_classes],
-                                                       stddev=0.1), name='out_W')
-        out_b = tf.Variable(tf.constant(0., shape=[self.data_loader.num_classes]), name='out_b')
+        intitalizer = 'glorot_uniform'
+        # CNN Block 1
+        conv1_out = Dropout(self.conv_dropouts[0])(self.x_in)
+        conv1_out = Conv2D(self.conv_depths[0], self.conv_patch_sizes[0],
+                           padding='same', activation=None, kernel_initializer=intitalizer)(conv1_out)
+        conv1_out = BatchNormalization()(conv1_out)
+        conv1_out = LeakyReLU(alpha=0.01)(conv1_out)
+        conv1_out = MaxPool2D(2, 2, padding='same')(conv1_out)
 
-        # CNNs
-        with tf.compat.v1.name_scope('CNN_Block_1'):
-            conv1_out = tf.compat.v1.layers.dropout(self.x, self.conv_dropouts[0], noise_shape=tf.concat(
-                [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, 1])], 0), training=self.is_training)
-            conv1_out = tf.compat.v1.layers.conv2d(conv1_out, self.conv_depths[0], self.conv_patch_sizes[0],
-                                                   padding='same', activation=None, kernel_initializer=intitalizer)
-            conv1_out = tf.compat.v1.layers.batch_normalization(conv1_out)
-            conv1_out = tf.nn.leaky_relu(conv1_out)
-            conv1_out = tf.compat.v1.layers.max_pooling2d(conv1_out, 2, 2, padding='same')
+        # CNN Block 2
+        conv2_out = Dropout(self.conv_dropouts[1])(conv1_out)
+        conv2_out = Conv2D(self.conv_depths[1], self.conv_patch_sizes[1],
+                           padding='same', activation=None, kernel_initializer=intitalizer)(conv2_out)
+        conv2_out = BatchNormalization()(conv2_out)
+        conv2_out = LeakyReLU(alpha=0.01)(conv2_out)
+        conv2_out = MaxPool2D(2, 2, padding='same')(conv2_out)
 
-        with tf.compat.v1.name_scope('CNN_Block_2'):
-            conv2_out = tf.compat.v1.layers.dropout(conv1_out, self.conv_dropouts[1], noise_shape=tf.concat(
-                [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, self.conv_depths[0]])], 0),
-                                                    training=self.is_training)
-            conv2_out = tf.compat.v1.layers.conv2d(conv2_out, self.conv_depths[1], self.conv_patch_sizes[1],
-                                                   padding='same', activation=None, kernel_initializer=intitalizer)
-            conv2_out = tf.compat.v1.layers.batch_normalization(conv2_out)
-            conv2_out = tf.nn.leaky_relu(conv2_out)
-            conv2_out = tf.compat.v1.layers.max_pooling2d(conv2_out, 2, 2, padding='same')
+        # CNN Block 3
+        conv3_out = Dropout(self.conv_dropouts[2])(conv2_out)
+        conv3_out = Conv2D(self.conv_depths[2], self.conv_patch_sizes[2],
+                           padding='same', activation=None, kernel_initializer=intitalizer)(conv3_out)
+        conv3_out = BatchNormalization()(conv3_out)
+        conv3_out = LeakyReLU(alpha=0.01)(conv3_out)
+        conv3_out = MaxPool2D(2, 2, padding='same')(conv3_out)
 
-        with tf.compat.v1.name_scope('CNN_Block_3'):
-            conv3_out = tf.compat.v1.layers.dropout(conv2_out, self.conv_dropouts[2], noise_shape=tf.concat(
-                [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, self.conv_depths[1]])], 0),
-                                                    training=self.is_training)
-            conv3_out = tf.compat.v1.layers.conv2d(conv3_out, self.conv_depths[2], self.conv_patch_sizes[2],
-                                                   padding='same', activation=None, kernel_initializer=intitalizer)
-            conv3_out = tf.compat.v1.layers.batch_normalization(conv3_out)
-            conv3_out = tf.nn.leaky_relu(conv3_out)
-            conv3_out = tf.compat.v1.layers.max_pooling2d(conv3_out, 2, 2, padding='same')
+        # CNN Block 4
+        conv4_out = Dropout(self.conv_dropouts[3])(conv3_out)
+        conv4_out = Conv2D(self.conv_depths[3], self.conv_patch_sizes[3],
+                           padding='same', activation=None, kernel_initializer=intitalizer)(conv4_out)
+        conv4_out = BatchNormalization()(conv4_out)
+        conv4_out = LeakyReLU(alpha=0.01)(conv4_out)
 
-        with tf.compat.v1.name_scope('CNN_Block_4'):
-            conv4_out = tf.compat.v1.layers.dropout(conv3_out, self.conv_dropouts[3], noise_shape=tf.concat(
-                [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, self.conv_depths[2]])], 0),
-                                                    training=self.is_training)
-            conv4_out = tf.compat.v1.layers.conv2d(conv4_out, self.conv_depths[3], self.conv_patch_sizes[3],
-                                                   padding='same', activation=None, kernel_initializer=intitalizer)
-            conv4_out = tf.compat.v1.layers.batch_normalization(conv4_out)
-            conv4_out = tf.nn.leaky_relu(conv4_out)
+        # CNN Block 5
+        conv5_out = Dropout(self.conv_dropouts[4])(conv4_out)
+        conv5_out = Conv2D(self.conv_depths[4], self.conv_patch_sizes[4],
+                           padding='same', activation=None, kernel_initializer=intitalizer)(conv5_out)
+        conv5_out = BatchNormalization()(conv5_out)
+        conv5_out = LeakyReLU(alpha=0.01)(conv5_out)
 
-        with tf.compat.v1.name_scope('CNN_Block_5'):
-            conv5_out = tf.compat.v1.layers.dropout(conv4_out, self.conv_dropouts[4], noise_shape=tf.concat(
-                [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, self.conv_depths[3]])], 0),
-                                                    training=self.is_training)
-            conv5_out = tf.compat.v1.layers.conv2d(conv5_out, self.conv_depths[4], self.conv_patch_sizes[4],
-                                                   padding='same', activation=None, kernel_initializer=intitalizer)
-            conv5_out = tf.compat.v1.layers.batch_normalization(conv5_out)
-            conv5_out = tf.nn.leaky_relu(conv5_out)
-
-        output = tf.transpose(a=conv5_out, perm=[2, 0, 1, 3])
-        output = tf.reshape(output, [-1, batch_size, (self.config.im_height // self.reduce_factor)*self.conv_depths[4]])
+        output = Lambda(lambda x: tf.transpose(a=x, perm=[2, 0, 1, 3]))(conv5_out)
+        output = Lambda(lambda x: tf.reshape(
+            x, [-1, batch_size, (self.config.im_height // self.reduce_factor)*self.conv_depths[4]]))(output)
 
         # RNN
-        with tf.compat.v1.variable_scope('MultiRNN', reuse=tf.compat.v1.AUTO_REUSE):
-            for i in range(self.rnn_num_layers):
-                output = tf.compat.v1.layers.dropout(output, self.rnn_dropout, training=self.is_training)
-                lstm = tf.contrib.cudnn_rnn.CudnnLSTM(1, self.rnn_num_hidden, 'linear_input', 'bidirectional')
-                output, state = lstm(output, sequence_lengths=self.length)
+        # Make values after length as 0 and implement it using keras Masking layer
+        mask = Lambda(lambda x: tf.transpose(tf.sequence_mask(x, maxlen=tf.shape(output)[0],
+                                                              dtype=tf.float32)))(self.length_in)
+        output = Multiply()([output, mask])
+        output = Masking()(output)
+
+        for _ in range(self.rnn_num_layers):
+            output = Bidirectional(LSTM(self.rnn_num_hidden, dropout=self.rnn_dropout,
+                                        time_major=True, return_sequences=True))(output)
 
         # Fully Connected
-        with tf.compat.v1.name_scope('Dense'):
-            # Linear dropout
-            output = tf.compat.v1.layers.dropout(output, self.linear_dropout, training=self.is_training)
-            # Reshaping to apply the same weights over the timesteps
-            output = tf.reshape(output, [-1, 2*self.rnn_num_hidden])
-            # Doing the affine projection
-            logits = tf.matmul(output, out_W) + out_b
+        output = Dropout(self.linear_dropout)(output)
+        # Reshaping to apply the same weights over the timesteps
+        output = Lambda(lambda x: tf.reshape(x, [-1, 2*self.rnn_num_hidden]))(output)
+        # Doing the affine projection
+        logits = Dense(self.data_loader.num_classes)(output)
 
         # Reshaping back to the original shape
-        self.logits = tf.reshape(logits, [-1, batch_size, self.data_loader.num_classes])
+        self.logits = Lambda(lambda x: tf.reshape(x, [-1, batch_size, self.data_loader.num_classes]))(logits)
 
-        with tf.compat.v1.variable_scope('loss-acc'):
-            self.loss = warpctc_tensorflow.ctc(self.logits, self.y.values, self.lab_length, self.length,
+        # self.prediction = tf.nn.ctc_beam_search_decoder(inputs=self.logits, sequence_length=self.length_in)
+        # self.cer = self.calc_cer(self.prediction[0][0], self.y)
+
+        if eval_mode:
+            self.model = tf.keras.Model(inputs=[self.x, self.length], output=self.logits)
+        else:
+            self.loss = warpctc_tensorflow.ctc(self.logits, self.y.values, self.lab_length, self.length_in,
                                                self.data_loader.num_classes - 1)
             self.cost = tf.reduce_mean(input_tensor=self.loss)
-            self.prediction = tf.compat.v1.nn.ctc_beam_search_decoder(inputs=self.logits, sequence_length=self.length,
-                                                                      merge_repeated=True)
-            self.cer = self.calc_cer(self.prediction[0][0], self.y)
-
-        with tf.compat.v1.variable_scope('train_step'):
-            update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
-            with tf.control_dependencies(update_ops):
-                self.train_step = tf.compat.v1.train.RMSPropOptimizer(learning_rate=self.config.learning_rate,
-                                                                      decay=self.config.learning_rate_decay)\
-                    .minimize(self.loss, global_step=self.global_step_tensor)
-
-        tf.compat.v1.add_to_collection('train', self.train_step)
-        tf.compat.v1.add_to_collection('train', self.cost)
-        tf.compat.v1.add_to_collection('train', self.cer)
-
-    def init_saver(self):
-        self.saver = tf.compat.v1.train.Saver(max_to_keep=self.config.max_to_keep, save_relative_paths=True)
+            self.model = tf.keras.Model([self.x, self.length, self.lab_length, self.y], self.logits)
+            # self.model.add_loss(self.loss)
+        # self.model.add_metric(self.cer, name='cer', aggregation='mean')
+        self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=self.config.learning_rate,
+                                               rho=self.config.learning_rate_decay)
+        self.model.compile(loss='categorical_crossentropy', optimizer=self.optimizer, metrics=None)

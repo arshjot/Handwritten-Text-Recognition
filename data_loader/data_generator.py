@@ -1,6 +1,5 @@
 import sys
-
-sys.path.extend(['..'])
+sys.path.extend([sys.path[0]+'/..'])
 
 import pickle
 import tensorflow as tf
@@ -12,47 +11,29 @@ class DataGenerator:
     def __init__(self, config):
         self.config = config
         # Load data
-        with open('../data/iam_h' + str(config.im_height) + '_char_map.pkl', 'rb') as f:
+        with open('./data/iam_h' + str(config.im_height) + '_char_map.pkl', 'rb') as f:
             data = pickle.load(f)
         char_map = data['char_map']
         self.char_map_inv = {i: j for j, i in char_map.items()}
-        self.train_dataset = tf.data.TFRecordDataset('../data/iam_h' + str(config.im_height) + '_train.tfrecords')
-        self.val_dataset = tf.data.TFRecordDataset('../data/iam_h' + str(config.im_height) + '_val.tfrecords')
-        self.test_dataset = tf.data.TFRecordDataset('../data/iam_h' + str(config.im_height) + '_test.tfrecords')
+        self.train_dataset = tf.data.TFRecordDataset('./data/iam_h' + str(config.im_height) + '_train.tfrecords')
+        self.val_dataset = tf.data.TFRecordDataset('./data/iam_h' + str(config.im_height) + '_val.tfrecords')
+        self.test_dataset = tf.data.TFRecordDataset('./data/iam_h' + str(config.im_height) + '_test.tfrecords')
 
         # Parse, augment (if training set) and batch
-        padded_shapes = ((tf.TensorShape([self.config.im_height, None])),
-                         (tf.TensorShape([None])), (tf.TensorShape([])), (tf.TensorShape([])))
-        padding_values = ((tf.constant(0.0)), (tf.constant(-1)), (tf.constant(0)), (tf.constant(0)))
-        if self.config.bucketing:
-            self.train_dataset = self.train_dataset.map(lambda x: self.parser(x, True),
-                                                        num_parallel_calls=self.config.batch_size) \
-                .apply(tf.data.experimental.bucket_by_sequence_length(
-                    element_length_func=self.element_length_fn,
-                    bucket_boundaries=range(500, 4501, 200),
-                    bucket_batch_sizes=[self.config.batch_size] * (len(range(500, 4501, 200)) + 1),
-                    padded_shapes=padded_shapes,
-                    padding_values=padding_values)) \
-                .shuffle(buffer_size=200)
-        else:
-            self.train_dataset = self.train_dataset.map(lambda x: self.parser(x, False),
-                                                        num_parallel_calls=self.config.batch_size) \
-                .shuffle(buffer_size=200) \
-                .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
+        self.train_dataset = self.train_dataset.map(lambda x: self.parser(x, False),
+                                                    num_parallel_calls=self.config.batch_size)\
+            .shuffle(buffer_size=200) \
+            .window(self.config.batch_size) \
+            .flat_map(self.batch_fn)
         self.val_dataset = self.val_dataset.map(self.parser, num_parallel_calls=self.config.batch_size) \
-            .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
+            .shuffle(buffer_size=50) \
+            .window(self.config.batch_size) \
+            .flat_map(self.batch_fn)
         self.test_dataset = self.test_dataset.map(self.parser, num_parallel_calls=self.config.batch_size) \
-            .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
-
-        # Batch
-        self.iterator = tf.compat.v1.data.Iterator.from_structure(
-            self.train_dataset.output_types, self.train_dataset.output_shapes)
-        self.training_init_op = self.iterator.make_initializer(self.train_dataset)
-        self.validation_init_op = self.iterator.make_initializer(self.val_dataset)
+            .window(self.config.batch_size) \
+            .flat_map(self.batch_fn)
 
         self.num_classes = data['num_chars']
-        self.num_iterations_train = data['len_train'] // self.config.batch_size
-        self.num_iterations_val = data['len_val'] // self.config.batch_size
 
     def parser(self, record, do_augment=False):
         keys_to_features = {
@@ -63,7 +44,7 @@ class DataGenerator:
         }
         parsed = tf.io.parse_single_example(serialized=record, features=keys_to_features)
         image = tf.image.decode_png(parsed['image_raw'], 1, tf.uint8)
-        label = tf.sparse.to_dense(tf.cast(parsed['label'], tf.int32))
+        label = tf.cast(parsed['label'], tf.int32)
         lab_length = tf.cast(parsed['lab_length'], tf.int32)
         height = tf.constant(self.config.im_height, tf.int32)
         width = tf.cast(parsed['width'], tf.int32)
@@ -82,19 +63,17 @@ class DataGenerator:
             width = aug_img.width
 
         image = tf.reshape(image, [height, width])
-        return image, label, width, lab_length
+        return image, width, lab_length, label
 
-    def element_length_fn(self, im, lab, w, lab_len):
-        return tf.shape(im)[1]
+    def batch_fn(self, im_dense, w_dense, lab_len_dense, sparse):
+        input_set = tf.data.Dataset.zip((
+            im_dense.padded_batch(self.config.batch_size, padded_shapes=tf.TensorShape([self.config.im_height, None]),
+                                  padding_values=tf.constant(0.0)),
+            w_dense.batch(self.config.batch_size),
+            lab_len_dense.batch(self.config.batch_size),
+            sparse.batch(self.config.batch_size)))
 
-    def initialize(self, sess, is_train):
-        if is_train:
-            sess.run(self.training_init_op)
-        else:
-            sess.run(self.validation_init_op)
-
-    def get_input(self):
-        return self.iterator.get_next()
+        return tf.data.Dataset.zip((input_set, sparse.batch(self.config.batch_size)))
 
 
 def main():
@@ -104,26 +83,21 @@ def main():
         im_height = 128
         batch_size = 5
 
-    tf.compat.v1.reset_default_graph()
-    sess = tf.compat.v1.Session()
-
     data_loader = DataGenerator(Config)
-    x_im, y, x_w, x_len = data_loader.get_input()
-    y = tf.contrib.layers.dense_to_sparse(y, eos_token=-1).values
-    x_im = tf.expand_dims(x_im, 3)
-    # translation_vector = tf.cast(tf.stack([(tf.shape(x_im)[2] - x_w) / tf.constant(2),
-    #                                        tf.constant(0.0, shape=[Config.batch_size], dtype=tf.float64)], axis=1),
-    #                              tf.float32)
-    # x_im = tf.contrib.image.translate(x_im, translation_vector)
+    for sample in data_loader.train_dataset:
+        [out_x_im, out_x_w, out_x_len, out_y], _ = sample
+        break
 
-    data_loader.initialize(sess, is_train=True)
-    out_x_im, out_x_w, out_x_len, out_y = sess.run([x_im, x_w, x_len, y])
+    out_y = out_y.values
+    out_x_im = tf.expand_dims(out_x_im, 3)
+    out_x_im, out_x_w, out_x_len, out_y = out_x_im.numpy(), out_x_w.numpy(), out_x_len.numpy(), out_y.numpy()
+
     out_y = np.split(out_y, np.cumsum(out_x_len))
     out_y = out_y[0]
     if Config.batch_size > 1:
         out_x_im = out_x_im[0]
 
-    with open('../data/iam_h' + str(Config.im_height) + '_char_map.pkl', 'rb') as f:
+    with open('./data/iam_h' + str(Config.im_height) + '_char_map.pkl', 'rb') as f:
         data = pickle.load(f)
     char_map = data['char_map']
     char_map_inv = {i: j for j, i in char_map.items()}
@@ -132,12 +106,17 @@ def main():
     plt.show()
 
     print(out_x_im.shape, out_x_im.dtype)
-    print(out_x_w.shape, out_x_w)
-    print(out_x_len.shape, out_x_len)
+    print(out_x_w.shape, out_x_w.dtype)
+    print(out_x_len.shape, out_x_len.dtype)
     print(out_y.shape, out_y.dtype)
 
-    data_loader.initialize(sess, is_train=False)
-    out_x_im, out_x_w, out_x_len, out_y = sess.run([x_im, x_w, x_len, y])
+    for sample in data_loader.val_dataset:
+        [out_x_im, out_x_w, out_x_len, out_y], _ = sample
+        break
+
+    out_y = out_y.values
+    out_x_im = tf.expand_dims(out_x_im, 3)
+    out_x_im, out_x_w, out_x_len, out_y = out_x_im.numpy(), out_x_w.numpy(), out_x_len.numpy(), out_y.numpy()
     out_y = np.split(out_y, np.cumsum(out_x_len))
     out_y = out_y[0]
     if Config.batch_size > 1:
