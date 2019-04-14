@@ -1,22 +1,23 @@
 from base.base_model import BaseModel
 import tensorflow as tf
+from stn import spatial_transformer_network as transformer
 import warpctc_tensorflow
-from models.model_utils.tcn import TemporalConvNet
 
 
 class Model(BaseModel):
     def __init__(self, data_loader, config):
         super(Model, self).__init__(config)
-        self.kernel_size = 3
-        self.nhid = 256
-        self.levels = 5
-        self.tcn_dropout = 0.1
+        self.rnn_num_hidden = 256
+        self.rnn_num_layers = 5
+        self.rnn_dropout = 0.5
         self.conv_patch_sizes = [3] * 5
         self.conv_depths = [16, 32, 48, 64, 80]
         self.conv_dropouts = [0, 0, 0.2, 0.2, 0.2]
         self.linear_dropout = 0.5
         self.reduce_factor = 8
-        self.clip_value = 1.0
+        self.stn_loc_conv_d = [8, 12]
+        self.stn_loc_conv_s = [3] * 2
+        self.stn_loc_fc = 32
 
         # Get the data_loader to make the joint of the inputs in the graph
         self.data_loader = data_loader
@@ -66,13 +67,31 @@ class Model(BaseModel):
         # Define CNN variables
         intitalizer = tf.contrib.layers.xavier_initializer_conv2d()
 
-        out_W = tf.Variable(tf.truncated_normal([self.nhid, self.data_loader.num_classes], stddev=0.1),
+        out_W = tf.Variable(tf.truncated_normal([2 * self.rnn_num_hidden, self.data_loader.num_classes], stddev=0.1),
                             name='out_W')
         out_b = tf.Variable(tf.constant(0., shape=[self.data_loader.num_classes]), name='out_b')
 
+        # localization network
+        W_fc1 = tf.Variable(tf.zeros([self.stn_loc_fc, 6]), name='W_fc1')
+        b_fc1 = tf.Variable(initial_value=[1., 0., 0., 0., 1., 0.], name='b_fc1')
+        with tf.name_scope('Localization'):
+            conv_loc = tf.layers.conv2d(self.x, self.stn_loc_conv_d[0], self.stn_loc_conv_s[0], padding='same')
+            conv_loc = tf.nn.leaky_relu(conv_loc)
+            conv_loc = tf.layers.max_pooling2d(conv_loc, 2, 2, padding='same')
+            conv_loc = tf.layers.conv2d(conv_loc, self.stn_loc_conv_d[1], self.stn_loc_conv_s[1], padding='same')
+            conv_loc = tf.nn.leaky_relu(conv_loc)
+
+            fc_loc = tf.reduce_mean(conv_loc, axis=[1, 2])
+            fc_loc = tf.layers.dense(fc_loc, self.stn_loc_fc)
+            fc_loc = tf.nn.leaky_relu(fc_loc)
+            theta = tf.matmul(fc_loc, W_fc1) + b_fc1
+
+        # spatial transformer network
+        h_trans = transformer(self.x, theta)
+
         # CNNs
         with tf.name_scope('CNN_Block_1'):
-            conv1_out = tf.layers.dropout(self.x, self.conv_dropouts[0], tf.concat(
+            conv1_out = tf.layers.dropout(h_trans, self.conv_dropouts[0], tf.concat(
                 [tf.reshape(batch_size, [-1]), tf.constant(value=[1, 1, 1])], 0), training=self.is_training)
             conv1_out = tf.layers.conv2d(conv1_out, self.conv_depths[0], self.conv_patch_sizes[0], padding='same',
                                          activation=None, kernel_initializer=intitalizer)
@@ -114,22 +133,24 @@ class Model(BaseModel):
             conv5_out = tf.layers.batch_normalization(conv5_out)
             conv5_out = tf.nn.leaky_relu(conv5_out)
 
-        output = tf.transpose(conv5_out, [0, 2, 1, 3])
-        output = tf.reshape(output, [batch_size, -1, (self.config.im_height//self.reduce_factor)*self.conv_depths[4]])
-        self.length = tf.tile(tf.expand_dims(tf.shape(output)[1], axis=0), [batch_size])
+        output = tf.transpose(conv5_out, [2, 0, 1, 3])
+        output = tf.reshape(output, [-1, batch_size, (self.config.im_height//self.reduce_factor)*self.conv_depths[4]])
+        self.length = tf.tile(tf.expand_dims(tf.shape(output)[0], axis=0), [batch_size])
 
-        # TCN
-        num_channels = [self.nhid] * self.levels
-        self.tcn = TemporalConvNet(num_channels, stride=1, kernel_size=self.kernel_size, dropout=self.tcn_dropout)
-        output = self.tcn(output)
-        output = tf.transpose(output, [1, 0, 2])
+        # RNN
+        with tf.variable_scope('MultiRNN', reuse=tf.AUTO_REUSE):
+            for i in range(self.rnn_num_layers):
+                output = tf.layers.dropout(output, self.rnn_dropout, training=self.is_training)
+                lstm = tf.contrib.cudnn_rnn.CudnnLSTM(1, self.rnn_num_hidden, 'linear_input', 'bidirectional')
+                output, state = lstm(output)
 
         # Fully Connected
         with tf.name_scope('Dense'):
+            output = tf.concat(output, 2)
             # Linear dropout
             output = tf.layers.dropout(output, self.linear_dropout, training=self.is_training)
             # Reshaping to apply the same weights over the timesteps
-            output = tf.reshape(output, [-1, self.nhid])
+            output = tf.reshape(output, [-1, 2*self.rnn_num_hidden])
             # Doing the affine projection
             logits = tf.matmul(output, out_W) + out_b
 
@@ -147,12 +168,9 @@ class Model(BaseModel):
         with tf.variable_scope('train_step'):
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             with tf.control_dependencies(update_ops):
-                optimizer = tf.train.RMSPropOptimizer(learning_rate=self.config.learning_rate,
-                                                      decay=self.config.learning_rate_decay)
-                gvs = optimizer.compute_gradients(self.loss)
-                capped_gvs = [(tf.clip_by_value(grad, -self.clip_value, self.clip_value), var) for grad, var in gvs]
-                self.train_op = optimizer.apply_gradients(capped_gvs)
-                self.train_step = optimizer.apply_gradients(capped_gvs, global_step=self.global_step_tensor)
+                self.train_step = tf.train.RMSPropOptimizer(learning_rate=self.config.learning_rate,
+                                                            decay=self.config.learning_rate_decay).minimize(
+                    self.loss, global_step=self.global_step_tensor)
 
         tf.add_to_collection('train', self.train_step)
         tf.add_to_collection('train', self.cost)
