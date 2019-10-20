@@ -20,12 +20,12 @@ sys.path.extend(['..'])
 import cv2
 import numpy as np
 from tqdm import tqdm
-import argparse
 import tensorflow as tf
 import pickle as pkl
 import re
+from utils.utils import get_args
+from utils.config import process_config
 
-out_height = 128
 
 def read_data(data_folder_path, out_height, out_name):
     """
@@ -124,18 +124,17 @@ def read_data(data_folder_path, out_height, out_name):
 
 
 if __name__ == '__main__':
-    # Construct the argument parse and parse the arguments
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-i", "--data_dir", required=False,
-                    help="Path of folder with lines.txt, lines & aachen_partition folders")
-    ap.add_argument("-oh", "--out_height", required=False, type=int, help="Height of the output image")
-    ap.add_argument("-o", "--output", required=False,
-                    help="Output directory and name for tfrecords file (do not include extension)")
-    args = vars(ap.parse_args())
+    # capture the config path from the run arguments, then process the json configuration file
+    try:
+        args = get_args()
+        config = process_config(args.config)
+    except:
+        print("missing or invalid arguments")
+        exit(0)
 
-    data_dir = './IAM/' if args['data_dir'] is None else args['data_dir']
-    height = 128 if args['out_height'] is None else args['out_height']
-    output = './iam' if args['output'] is None else args['output']
+    data_dir = './'+config.dataset+'/'
+    height = config.im_height
+    output = './'+config.dataset
 
     print('Loading Data:')
     read_data(data_folder_path=data_dir, out_height=height, out_name=output + '_h' + str(height))
