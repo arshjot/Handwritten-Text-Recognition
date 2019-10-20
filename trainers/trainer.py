@@ -119,7 +119,8 @@ class Trainer(BaseTrain):
             'test/loss_per_epoch': loss,
             'test/cer_per_epoch': cer,
         }
-        self.summarizer.summarize(self.model.global_step_tensor.eval(self.sess), summaries_dict)
+        if self.summarizer is not None:
+            self.summarizer.summarize(self.model.global_step_tensor.eval(self.sess), summaries_dict)
 
         print("""\tVal - loss:{:.4f} -- cer:{:.4f}""".format(loss, cer))
 
