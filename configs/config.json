@@ -1,11 +1,11 @@
 {
   "dataset": "IAM",
 
-  "exp_name": "CRNN-STN_h128",
+  "exp_name": "CRNN_h128",
   "train_from_start": 1,
   "random_prediction": 1,
 
-  "architecture": "CRNN-STN",
+  "architecture": "CRNN",
 
   "im_height": 128,
   "bucketing": 0,
