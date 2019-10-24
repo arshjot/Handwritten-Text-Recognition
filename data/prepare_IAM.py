@@ -86,7 +86,7 @@ def read_data(data_folder_path, out_height, out_name):
         img = cv2.bitwise_not(img)
         img = np.divide(img.astype(np.float32), 255.0)
         out_width = img.shape[1]
-        img = cv2.imencode('.jpg', img)[1].tostring()
+        img = cv2.imencode('.png', img)[1].tostring()
 
         example_img = tf.train.Example(features=tf.train.Features(feature={
             'image_raw': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img])),
