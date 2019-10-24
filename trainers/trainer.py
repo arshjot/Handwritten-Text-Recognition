@@ -1,6 +1,7 @@
 from base.base_train import BaseTrain
 import numpy as np
 import tensorflow as tf
+from tqdm import tqdm
 
 
 class Trainer(BaseTrain):
@@ -92,7 +93,7 @@ class Trainer(BaseTrain):
                                     feed_dict={self.is_training: True})
             return loss
 
-    def test(self):
+    def test(self, tqdm_enable=False):
         # initialize dataset
         self.data_loader.initialize(self.sess, is_train=False)
 
@@ -102,7 +103,7 @@ class Trainer(BaseTrain):
 
         losses, cers = [], []
         # Iterate over batches
-        for _ in tt:
+        for _ in tqdm(tt, disable=not tqdm_enable):
             if self.config.random_prediction & (_ == sample_num):
                 loss, cer, predictions, label = self.sess.run([self.loss_node, self.acc_node, self.pred, self.y],
                                                               feed_dict={self.is_training: False})

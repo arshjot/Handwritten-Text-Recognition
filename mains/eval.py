@@ -35,7 +35,7 @@ def eval():
     trainer = Trainer(sess, model, config, None, data_loader)
 
     # here we evaluate on the test dataset
-    test_loss, test_cer = trainer.test()
+    test_loss, test_cer = trainer.test(tqdm_enable=True)
     print('\nTest set Loss:', test_loss)
     print('Test set CER:', round(test_cer*100, 2), '%')
 
