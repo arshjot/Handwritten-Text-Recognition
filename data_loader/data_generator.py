@@ -37,16 +37,17 @@ class DataGenerator:
                 self.test_init_op = self.iterator.make_initializer(self.test_dataset)
 
                 self.num_iterations_val = data['len_test'] // self.config.batch_size
-            else:  # Predict on new images kept in 'eval_data' directory
-                file_list = glob.glob('../eval_data/*')
+            else:  # Predict on new images kept in 'samples' directory
+                file_list = sorted(glob.glob('../samples/processed/*'))  # Sort to keep track of file names
                 self.test_dataset = tf.data.Dataset.from_tensor_slices(file_list)
                 self.test_dataset = self.test_dataset.map(self.parser_directory, num_parallel_calls=8) \
-                    .padded_batch(1, padded_shapes=padded_shapes, padding_values=padding_values)
+                    .padded_batch(self.config.batch_size, padded_shapes=padded_shapes, padding_values=padding_values)
                 self.iterator = tf.data.Iterator.from_structure(
                     self.test_dataset.output_types, self.test_dataset.output_shapes)
                 self.test_init_op = self.iterator.make_initializer(self.test_dataset)
 
-                self.num_iterations_val = len(file_list)
+                self.num_iterations_val = (len(file_list) // self.config.batch_size) + \
+                    int(not len(file_list) % self.config.batch_size == 0)
 
         else:  # For training and validation sets
             self.train_dataset = tf.data.TFRecordDataset(data_dir + 'train.tfrecords')
@@ -114,8 +115,10 @@ class DataGenerator:
         image = tf.image.decode_image(image_string, 3, tf.uint8)
         image = tf.image.rgb_to_grayscale(image)
         width = tf.shape(image)[1]
-        image = tf.cast(image, tf.float32)
-        label, lab_length = None, None
+        image = 1-tf.divide(tf.cast(image, tf.float32), 255.0)
+        height = tf.constant(self.config.im_height, tf.int32)
+        image = tf.reshape(image, [height, width])
+        label, lab_length = [0], 0  # dummy values
 
         return image, label, width, lab_length
 
