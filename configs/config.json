@@ -2,7 +2,7 @@
   "dataset": "IAM",
 
   "exp_name": "CRNN_h128",
-  "train_from_start": 1,
+  "train_from_start": 0,
   "random_prediction": 1,
 
   "architecture": "CRNN",
@@ -16,6 +16,5 @@
   "learning_rate_decay": 0.95,
 
   "max_to_keep_cpt": 1,
-  "max_to_keep_best": 1,
-  "load_best": 0
+  "max_to_keep_best": 1
 }

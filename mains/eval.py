@@ -32,7 +32,7 @@ def eval():
     model = Model(data_loader, config)
 
     # create trainer and path all previous components to it
-    trainer = Trainer(sess, model, config, None, data_loader)
+    trainer = Trainer(sess, model, config, None, data_loader, load_best=True)
 
     # here we evaluate on the test dataset
     test_loss, test_cer = trainer.test(tqdm_enable=True)

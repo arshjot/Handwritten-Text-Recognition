@@ -5,11 +5,11 @@ from tqdm import tqdm
 
 
 class Trainer(BaseTrain):
-    def __init__(self, sess, model, config, logger, data_loader):
+    def __init__(self, sess, model, config, logger, data_loader, load_best=False):
         super(Trainer, self).__init__(sess, model, config, logger, data_loader)
 
         # load the model from the latest checkpoint
-        if self.config.load_best:
+        if load_best:
             self.model.load(self.sess, self.config.best_model_dir)
         else:
             self.model.load(self.sess, self.config.checkpoint_dir)
