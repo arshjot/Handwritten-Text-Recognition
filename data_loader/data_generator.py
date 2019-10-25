@@ -37,7 +37,7 @@ class DataGenerator:
                 self.test_init_op = self.iterator.make_initializer(self.test_dataset)
 
                 self.num_iterations_val = data['len_test'] // self.config.batch_size + \
-                    int(not len(data['len_test']) % self.config.batch_size == 0)
+                    int(not data['len_test'] % self.config.batch_size == 0)
             else:  # Predict on new images kept in 'samples' directory
                 file_list = sorted(glob.glob('../samples/processed/*'))  # Sort to keep track of file names
                 self.test_dataset = tf.data.Dataset.from_tensor_slices(file_list)
@@ -79,9 +79,9 @@ class DataGenerator:
             self.validation_init_op = self.iterator.make_initializer(self.val_dataset)
 
             self.num_iterations_train = data['len_train'] // self.config.batch_size + \
-                int(not len(data['len_train']) % self.config.batch_size == 0)
+                int(not data['len_train'] % self.config.batch_size == 0)
             self.num_iterations_val = data['len_val'] // self.config.batch_size + \
-                int(not len(data['len_val']) % self.config.batch_size == 0)
+                int(not data['len_val'] % self.config.batch_size == 0)
 
     def parser(self, record, do_augment=False):
         keys_to_features = {
