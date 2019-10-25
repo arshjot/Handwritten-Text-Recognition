@@ -162,7 +162,7 @@ class Model(BaseModel):
                                                self.data_loader.num_classes - 1)
             self.cost = tf.reduce_mean(self.loss)
             self.prediction = tf.nn.ctc_beam_search_decoder(self.logits, sequence_length=self.length,
-                                                            merge_repeated=True)
+                                                            merge_repeated=False)
             self.cer = self.calc_cer(self.prediction[0][0], self.y)
 
         with tf.variable_scope('train_step'):
