@@ -34,11 +34,11 @@ and keep the lines partition in the `/data/IAM/` directory as shown below:
     ├── data
     │   ├── IAM
     │   │   ├── lines
-    |   |   |   |── a01-000u-00.png
-    |   |   |   |── a01-000u-01.png
-    |   |   |   |── .
-    |   |   |   |── .
-    |   |   |   |── .
+    │   │   │   ├── a01-000u-00.png
+    │   │   │   ├── a01-000u-01.png
+    │   │   │   ├── .
+    │   │   │   ├── .
+    │   │   │   ├── .
     │   │   ├── lines.txt
     ```
 2. If required, modify the `/configs/config.json` file to change model architecture , image height, etc.
