@@ -11,7 +11,7 @@
   "bucketing": 0,
 
   "batch_size": 4,
-  "num_epochs": 160,
+  "num_epochs": 100,
   "learning_rate": 0.0003,
   "learning_rate_decay": 0.95,
 
