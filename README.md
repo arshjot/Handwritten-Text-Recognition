@@ -2,7 +2,7 @@
 Code and model weights for English handwritten text recognition model trained on IAM Handwriting Database. 
 It is more or less a TensorFlow port of [Joan Puigcerver's amazing work on HTR](https://github.com/jpuigcerver/Laia/tree/master/egs/iam).
 This framework could also be used for building similar models using other datasets. 
-Codes for 3 architectures, BLSTM, CRNN, and STN followed by CRNN, have been provided.
+Codes for 3 architectures - BLSTM, CRNN, and STN followed by CRNN - have been provided.
 
 ![Inigo Montoya](./samples/inigo_montoya1.png)
 ![Inigo Montoya](./samples/inigo_montoya2.png)
@@ -10,7 +10,7 @@ Codes for 3 architectures, BLSTM, CRNN, and STN followed by CRNN, have been prov
 ![Inigo Montoya](sample_output.png)
 
 
-*Guess its Anigo Montoya now...*
+*Guess it's Anigo Montoya now...*
 
 ## Requirements
 - [ImageMagick](https://www.imagemagick.org/) - for image processing
