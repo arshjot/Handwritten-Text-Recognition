@@ -8,6 +8,7 @@ Codes for 3 architectures, BLSTM, CRNN, and STN followed by CRNN, have been prov
 ![Inigo Montoya](./samples/inigo_montoya2.png)
 
 ![Inigo Montoya](sample_output.png)
+
 *Guess its Anigo Montoya now...*
 
 ## Requirements
